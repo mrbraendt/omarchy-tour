@@ -12,7 +12,7 @@ function allSteps() {
       body: "One shortcut for apps, settings, and every Omarchy command. There is no dock.",
       keys: [{ key: "Space", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "Space"],
-      spotlight: "none",
+      spotlight: "layer:omarchy.menu",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-menu", "toggle"] },
@@ -26,7 +26,7 @@ function allSteps() {
       emptyBody: "Two demo windows split the screen. That is tiling. Super + T floats one if you want it free again.",
       keys: [{ key: "T", meta: true, alt: false, ctrl: false, shift: false, command: ["tour-demo", "act", "float"] }],
       keycaps: ["Super", "T"],
-      spotlight: "none",
+      spotlight: "windows,desktop",
       diagram: "tiling",
       enter: "demo",
       demo: { command: ["tour-demo", "act", "float"] },
@@ -41,7 +41,7 @@ function allSteps() {
       emptyBody: "Hold Super and left-click drag to move a demo window. Super and right-click drag resizes the split.",
       keys: [],
       keycaps: ["Super", "Mouse L", "Mouse R"],
-      spotlight: "none",
+      spotlight: "windows,desktop",
       diagram: "move",
       enter: "demo",
       demo: null,
@@ -65,7 +65,7 @@ function allSteps() {
         { key: "Down", meta: true, alt: false, ctrl: false, shift: true, command: ["tour-demo", "act", "swap", "d"] }
       ],
       keycaps: ["Super", "Shift", "Left"],
-      spotlight: "none",
+      spotlight: "windows,desktop",
       diagram: "snap",
       enter: "demo",
       demo: { command: ["tour-demo", "act", "swap", "l"] },
@@ -83,7 +83,7 @@ function allSteps() {
         { key: "Equal", meta: true, alt: false, ctrl: false, shift: false, command: ["tour-demo", "act", "resize"] }
       ],
       keycaps: ["Super", "-", "="],
-      spotlight: "none",
+      spotlight: "windows,desktop",
       diagram: "resize",
       enter: "demo",
       demo: { command: ["tour-demo", "act", "resize"] },
@@ -98,7 +98,7 @@ function allSteps() {
       emptyBody: "Super + O pops a demo window out and pins it above the tiles. Super + T only toggles floating.",
       keys: [{ key: "O", meta: true, alt: false, ctrl: false, shift: false, command: ["tour-demo", "act", "pop"] }],
       keycaps: ["Super", "O"],
-      spotlight: "none",
+      spotlight: "windows,desktop",
       diagram: "float",
       enter: "demo",
       demo: { command: ["tour-demo", "act", "pop"] },
@@ -115,7 +115,7 @@ function allSteps() {
         { key: "1", meta: true, alt: false, ctrl: false, shift: false }
       ],
       keycaps: ["Super", "Tab"],
-      spotlight: "none",
+      spotlight: "chip:omarchy.workspaces",
       diagram: "workspaces",
       enter: "demo",
       demo: { command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = \"e+1\" })"] },
@@ -142,7 +142,7 @@ function allSteps() {
       body: "Super + Return opens a terminal.",
       keys: [{ key: "Enter", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "Return"],
-      spotlight: "none",
+      spotlight: "app:new,desktop",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-terminal"] },
@@ -155,7 +155,7 @@ function allSteps() {
       body: "Super + Shift + Return opens the browser. It tiles next to whatever is already open.",
       keys: [{ key: "Enter", meta: true, alt: false, ctrl: false, shift: true }],
       keycaps: ["Super", "Shift", "Return"],
-      spotlight: "none",
+      spotlight: "app:new,desktop",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-browser"] },
@@ -168,7 +168,7 @@ function allSteps() {
       body: "Super + Shift + F opens the file manager. Or type Files in the menu.",
       keys: [{ key: "F", meta: true, alt: false, ctrl: false, shift: true }],
       keycaps: ["Super", "Shift", "F"],
-      spotlight: "none",
+      spotlight: "app:new,desktop",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-nautilus"] },
@@ -178,10 +178,10 @@ function allSteps() {
     {
       id: "bar",
       title: "The bar",
-      body: "The bar is what you see at the top of the screen. Drag it to any edge. Double-click empty space to toggle transparency. Click a chip for its panel. Tour lives here — click it anytime.",
+      body: "The bar sits on one edge of the screen — top by default. Drag it to any edge. Double-click empty space to toggle transparency. Click a chip for its panel. Tour lives here — click it anytime.",
       keys: [],
       keycaps: [],
-      spotlight: "none",
+      spotlight: "bar",
       diagram: "none",
       enter: "continue",
       demo: null,
@@ -194,7 +194,7 @@ function allSteps() {
       body: "Super + Ctrl + V pastes from history, including images. Sensitive copies stay out of the list.",
       keys: [{ key: "V", meta: true, alt: false, ctrl: true, shift: false }],
       keycaps: ["Super", "Ctrl", "V"],
-      spotlight: "none",
+      spotlight: "layer:omarchy.clipboard",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-shell", "shell", "toggle", "omarchy.clipboard"] },
@@ -207,7 +207,7 @@ function allSteps() {
       body: "If a monitor, printer, or speaker does not work, ask the agent. Super + Shift + Ctrl + A opens it. Choose which agent in the menu: Setup → Defaults → Agent.",
       keys: [{ key: "A", meta: true, alt: false, ctrl: true, shift: true }],
       keycaps: ["Super", "Shift", "Ctrl", "A"],
-      spotlight: "none",
+      spotlight: "layer:omarchy.menu,app:org.omarchy.agent,desktop",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-agent", "--pick"] },
@@ -221,7 +221,7 @@ function allSteps() {
       body: "Super + K opens every shortcut in a searchable list.",
       keys: [{ key: "K", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "K"],
-      spotlight: "none",
+      spotlight: "layer:omarchy.menu",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-menu-keybindings"] },
@@ -237,7 +237,7 @@ function allSteps() {
         { key: "Space", meta: true, alt: false, ctrl: true, shift: true }
       ],
       keycaps: ["Super", "Ctrl", "Space"],
-      spotlight: "none",
+      spotlight: "layer:omarchy.menu",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-menu", "toggle", "background"] },
@@ -250,7 +250,7 @@ function allSteps() {
       body: "Learn in the menu has the full manual. Click Tour on the bar to run this again. Press Enter once for a recap of the shortcuts from this tour.",
       keys: [],
       keycaps: [],
-      spotlight: "none",
+      spotlight: "chip:io.github.julio.tour",
       diagram: "none",
       enter: "overview",
       demo: null,
@@ -312,11 +312,55 @@ function knownDiagrams() {
   return ["none", "tiling", "workspaces", "move", "snap", "monitors", "float", "resize"]
 }
 
+function parseSpotlight(value) {
+  var raw = String(value || "none").replace(/^\s+|\s+$/g, "")
+  if (raw === "bar") return { kind: "bar", id: "" }
+  if (raw === "windows") return { kind: "windows", id: "" }
+  if (raw === "desktop") return { kind: "desktop", id: "" }
+  if (raw.indexOf("chip:") === 0) {
+    var chip = raw.substring(5).replace(/^\s+|\s+$/g, "")
+    if (chip) return { kind: "chip", id: chip }
+  }
+  if (raw.indexOf("layer:") === 0) {
+    var layer = raw.substring(6).replace(/^\s+|\s+$/g, "")
+    if (layer) return { kind: "layer", id: layer }
+  }
+  if (raw.indexOf("app:") === 0) {
+    var app = raw.substring(4).replace(/^\s+|\s+$/g, "")
+    if (app) return { kind: "app", id: app }
+  }
+  return { kind: "none", id: "" }
+}
+
+function parseSpotlights(value) {
+  var raw = String(value || "none")
+  if (raw === "none" || !raw.replace(/^\s+|\s+$/g, "").length) return []
+  var parts = raw.split(",")
+  var out = []
+  for (var i = 0; i < parts.length; i++) {
+    var parsed = parseSpotlight(parts[i])
+    if (parsed.kind !== "none") out.push(parsed)
+  }
+  return out
+}
+
+function spotlightValid(value) {
+  var raw = String(value || "none").replace(/^\s+|\s+$/g, "")
+  if (raw === "none" || raw === "") return true
+  var parts = raw.split(",")
+  if (!parts.length) return false
+  for (var i = 0; i < parts.length; i++) {
+    if (parseSpotlight(parts[i]).kind === "none") return false
+  }
+  return true
+}
+
 function resolveStep(step, opts) {
   if (!step) return null
   var copy = {}
   for (var key in step) copy[key] = step[key]
   if (!copy.diagram) copy.diagram = "none"
+  if (!copy.spotlight) copy.spotlight = "none"
   if (step.needsWindows && windowsMissing(opts)) {
     if (step.emptyBody) copy.body = step.emptyBody
     if (step.emptyEnter) copy.enter = step.emptyEnter

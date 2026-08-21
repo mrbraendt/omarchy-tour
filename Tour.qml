@@ -42,6 +42,19 @@ Item {
   readonly property string diagramKind: (!root.choosing && root.step && root.step.diagram) ? String(root.step.diagram) : "none"
   readonly property bool showHints: root.choosing || root.stepIndex === 0 || root.onLast
   readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.trackOpts())
+  readonly property var spotlight: TourModel.parseSpotlight(root.step && root.step.spotlight)
+  readonly property var spotlightTargets: TourModel.parseSpotlights(root.step && root.step.spotlight)
+  property color dimScrim: Util.alpha(Color.background, 0.58)
+  property int holeX: 0
+  property int holeY: 0
+  property int holeW: 0
+  property int holeH: 0
+  property bool holeActive: false
+  property var demoClientRects: []
+  property var newClientRects: []
+  property var classClientRects: ({})
+  property var clientSnapshot: []
+  property var lastClientData: []
 
   property color background: Color.menu.background
   property color foreground: Color.menu.text
@@ -57,6 +70,243 @@ Item {
 
   function nonempty(list) {
     return !!(list && list.length)
+  }
+
+  function overlayScreen() {
+    return panel.screen || null
+  }
+
+  function sameScreen(a, b) {
+    if (!a || !b) return false
+    if (a === b) return true
+    return !!a.name && !!b.name && String(a.name) === String(b.name)
+  }
+
+  function padRect(rect, pad) {
+    if (!rect) return null
+    var x = Math.round(rect.x) - pad
+    var y = Math.round(rect.y) - pad
+    var w = Math.round(rect.width) + pad * 2
+    var h = Math.round(rect.height) + pad * 2
+    var maxW = Math.max(1, panel.width)
+    var maxH = Math.max(1, panel.height)
+    if (x < 0) { w += x; x = 0 }
+    if (y < 0) { h += y; y = 0 }
+    if (x + w > maxW) w = maxW - x
+    if (y + h > maxH) h = maxH - y
+    if (w < 8 || h < 8) return null
+    return { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) }
+  }
+
+  function barEdgeRect() {
+    var bar = root.shell && root.shell.bar ? root.shell.bar : null
+    if (!bar || bar.barHidden) return null
+    var size = Number(bar.barSize)
+    if (!isFinite(size) || size < 4) size = Style.bar ? Style.bar.sizeHorizontal : 26
+    var pos = String(bar.position || "top")
+    var w = panel.width
+    var h = panel.height
+    var pad = Style.space(8)
+    if (pos === "bottom") return root.padRect({ x: 0, y: h - size, width: w, height: size }, pad)
+    if (pos === "left") return root.padRect({ x: 0, y: 0, width: size, height: h }, pad)
+    if (pos === "right") return root.padRect({ x: w - size, y: 0, width: size, height: h }, pad)
+    return root.padRect({ x: 0, y: 0, width: w, height: size }, pad)
+  }
+
+  function chipRect(moduleId) {
+    var bar = root.shell && root.shell.bar ? root.shell.bar : null
+    if (!bar || !bar.moduleSlots || !moduleId) return null
+    var overlay = root.overlayScreen()
+    var pad = Style.space(10)
+    var fallback = null
+    for (var i = 0; i < bar.moduleSlots.length; i++) {
+      var slot = bar.moduleSlots[i]
+      if (!slot || String(slot.moduleName || "") !== String(moduleId)) continue
+      if (!slot.visible || slot.width < 4 || slot.height < 4) continue
+      var win = typeof bar.slotWindow === "function" ? bar.slotWindow(slot) : null
+      var point = { x: slot.x, y: slot.y }
+      try { point = slot.mapToItem(null, 0, 0) } catch (e) {}
+      if (win && typeof bar.windowScreenPoint === "function")
+        point = bar.windowScreenPoint(point, win)
+      var rect = { x: point.x, y: point.y, width: slot.width, height: slot.height }
+      if (win && overlay && root.sameScreen(win.screen, overlay))
+        return root.padRect(rect, pad)
+      if (!fallback) fallback = rect
+    }
+    return root.padRect(fallback, pad)
+  }
+
+  function desktopRect() {
+    var bar = root.shell && root.shell.bar ? root.shell.bar : null
+    var size = 0
+    var pos = "top"
+    if (bar && !bar.barHidden) {
+      size = Number(bar.barSize)
+      pos = String(bar.position || "top")
+    }
+    if (!isFinite(size) || size < 0) size = 0
+    var pad = Style.space(8)
+    var w = panel.width
+    var h = panel.height
+    if (pos === "bottom") return { x: pad, y: pad, width: Math.max(8, w - pad * 2), height: Math.max(8, h - size - pad) }
+    if (pos === "left") return { x: size, y: pad, width: Math.max(8, w - size - pad), height: Math.max(8, h - pad * 2) }
+    if (pos === "right") return { x: pad, y: pad, width: Math.max(8, w - size - pad), height: Math.max(8, h - pad * 2) }
+    return { x: pad, y: size, width: Math.max(8, w - pad * 2), height: Math.max(8, h - size - pad) }
+  }
+
+  function pluginItem(pluginId) {
+    if (!root.shell || !root.shell.panelLoaders || !pluginId) return null
+    var loader = root.shell.panelLoaders[pluginId]
+    return loader && loader.item ? loader.item : null
+  }
+
+  function pluginCardRect(pluginId) {
+    var item = root.pluginItem(pluginId)
+    if (!item || item.opened !== true) return null
+    var w = Number(item.cardWidth)
+    var h = Number(item.cardHeight)
+    if (!isFinite(w) || !isFinite(h) || w < 32 || h < 32) return null
+    var x = Math.round((panel.width - w) / 2)
+    var y = Math.round((panel.height - h) / 2)
+    var gap = Style.gapsOut || Style.space(8)
+    if (y < gap) y = gap
+    if (x < gap) x = gap
+    return root.padRect({ x: x, y: y, width: w, height: h }, Style.space(10))
+  }
+
+  function unionRects(rects) {
+    if (!rects || !rects.length) return null
+    var x1 = rects[0].x
+    var y1 = rects[0].y
+    var x2 = rects[0].x + rects[0].width
+    var y2 = rects[0].y + rects[0].height
+    for (var i = 1; i < rects.length; i++) {
+      var r = rects[i]
+      if (r.x < x1) x1 = r.x
+      if (r.y < y1) y1 = r.y
+      if (r.x + r.width > x2) x2 = r.x + r.width
+      if (r.y + r.height > y2) y2 = r.y + r.height
+    }
+    return root.padRect({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, Style.space(12))
+  }
+
+  function appRect(appId) {
+    if (appId === "new") return root.unionRects(root.newClientRects)
+    var map = root.classClientRects || ({})
+    return root.unionRects(map[appId] || [])
+  }
+
+  function rectForTarget(target) {
+    if (!target) return null
+    if (target.kind === "bar") return root.barEdgeRect()
+    if (target.kind === "chip") return root.chipRect(target.id)
+    if (target.kind === "windows") return root.unionRects(root.demoClientRects)
+    if (target.kind === "desktop") return root.desktopRect()
+    if (target.kind === "layer") return root.pluginCardRect(target.id)
+    if (target.kind === "app") return root.appRect(target.id)
+    return null
+  }
+
+  function applyHole(rect) {
+    if (!rect) {
+      root.holeActive = false
+      root.holeW = 0
+      root.holeH = 0
+      return
+    }
+    root.holeX = rect.x
+    root.holeY = rect.y
+    root.holeW = rect.width
+    root.holeH = rect.height
+    root.holeActive = true
+  }
+
+  function refreshSpotlight() {
+    if (root.choosing || !root.opened || root.overviewing) {
+      root.applyHole(null)
+      return
+    }
+    var targets = root.spotlightTargets
+    for (var i = 0; i < targets.length; i++) {
+      var rect = root.rectForTarget(targets[i])
+      if (rect) {
+        root.applyHole(rect)
+        return
+      }
+    }
+    root.applyHole(null)
+  }
+
+  function addressKnown(addr) {
+    var snap = root.clientSnapshot
+    if (!snap || !snap.length) return false
+    for (var i = 0; i < snap.length; i++) {
+      if (snap[i] === addr) return true
+    }
+    return false
+  }
+
+  function snapshotClients(data) {
+    var addrs = []
+    if (data && data.length) {
+      for (var i = 0; i < data.length; i++) {
+        if (data[i] && data[i].address) addrs.push(String(data[i].address))
+      }
+    }
+    root.clientSnapshot = addrs
+  }
+
+  function clientLocalRect(client) {
+    var screen = root.overlayScreen()
+    var at = client.at || [0, 0]
+    var size = client.size || [0, 0]
+    var w = Number(size[0])
+    var h = Number(size[1])
+    if (!isFinite(w) || !isFinite(h) || w < 8 || h < 8) return null
+    var sx = screen ? Number(screen.x) : 0
+    var sy = screen ? Number(screen.y) : 0
+    var sw = screen ? Number(screen.width) : panel.width
+    var sh = screen ? Number(screen.height) : panel.height
+    var candidates = [
+      { x: Number(at[0]) - sx, y: Number(at[1]) - sy, width: w, height: h },
+      { x: Number(at[0]), y: Number(at[1]), width: w, height: h }
+    ]
+    for (var i = 0; i < candidates.length; i++) {
+      var r = candidates[i]
+      if (!isFinite(r.x) || !isFinite(r.y)) continue
+      if (r.x + r.width < 0 || r.y + r.height < 0 || r.x > sw || r.y > sh) continue
+      return r
+    }
+    return null
+  }
+
+  function ingestClients(data) {
+    root.lastClientData = data || []
+    var n = 0
+    var demos = []
+    var fresh = []
+    var byClass = ({})
+    if (data && data.length) {
+      for (var i = 0; i < data.length; i++) {
+        var client = data[i]
+        if (!client || client.mapped === false) continue
+        n++
+        var rect = root.clientLocalRect(client)
+        var cls = String(client.class || "")
+        if (cls === "io.github.julio.tour.demo" && rect) demos.push(rect)
+        if (rect && client.address && !root.addressKnown(String(client.address))) fresh.push(rect)
+        if (rect && cls) {
+          if (!byClass[cls]) byClass[cls] = []
+          byClass[cls].push(rect)
+        }
+      }
+    }
+    if (root.spawnedDemos) n = Math.max(n, 2)
+    root.clientCount = n
+    root.demoClientRects = demos
+    root.newClientRects = fresh
+    root.classClientRects = byClass
+    root.refreshSpotlight()
   }
 
   function trackOpts() {
@@ -118,6 +368,11 @@ Item {
   }
 
   Component.onCompleted: root.probeAll()
+
+  onPausedChanged: root.refreshSpotlight()
+  onOverviewingChanged: root.refreshSpotlight()
+  onChoosingChanged: root.refreshSpotlight()
+  onOpenedChanged: if (root.opened) Qt.callLater(root.refreshSpotlight)
 
   function refocus() {
     Qt.callLater(function() {
@@ -256,6 +511,7 @@ Item {
     root.keyBeat = 0
     root.syncDemoWindows(next)
     root.refocus()
+    Qt.callLater(root.refreshSpotlight)
   }
 
   function applyStep(index, instant) {
@@ -303,11 +559,13 @@ Item {
   }
 
   function runDemo(step, ev) {
+    root.snapshotClients(root.lastClientData)
     root.paused = true
     root.syncLights()
     root.execTourCommand(TourModel.demoCommand(step, ev || null))
     resumeTimer.interval = Math.max(800, Number(step && step.resumeMs) || 4000)
     resumeTimer.restart()
+    Qt.callLater(root.refreshSpotlight)
   }
 
   function practice(ev) {
@@ -315,6 +573,7 @@ Item {
     root.practiced = true
     var cmd = TourModel.demoCommand(root.step, ev)
     if (cmd && cmd.length) {
+      root.snapshotClients(root.lastClientData)
       root.paused = true
       root.syncLights()
       root.execTourCommand(cmd)
@@ -323,6 +582,7 @@ Item {
       ? Math.max(1200, Number(root.step.resumeMs) || 1600)
       : 850
     practiceTimer.restart()
+    Qt.callLater(root.refreshSpotlight)
   }
 
   function onLastEnter() {
@@ -712,17 +972,11 @@ Item {
       waitForEnd: true
       onStreamFinished: {
         try {
-          var data = JSON.parse(text)
-          var n = 0
-          if (data && data.length) {
-            for (var i = 0; i < data.length; i++) {
-              if (data[i] && data[i].mapped !== false) n++
-            }
-          }
-          if (root.spawnedDemos) n = Math.max(n, 2)
-          root.clientCount = n
+          root.ingestClients(JSON.parse(text))
         } catch (e) {
+          root.demoClientRects = []
           if (!root.spawnedDemos) root.clientCount = 0
+          if (root.spotlightTargets.length) root.refreshSpotlight()
         }
       }
     }
@@ -791,6 +1045,33 @@ Item {
     }
   }
 
+  Timer {
+    id: spotlightTimer
+    interval: 350
+    repeat: true
+    running: root.panelVisible && !root.choosing && root.spotlightTargets.length > 0
+    onTriggered: {
+      var needsClients = false
+      for (var i = 0; i < root.spotlightTargets.length; i++) {
+        var kind = root.spotlightTargets[i].kind
+        if (kind === "windows" || kind === "app") needsClients = true
+      }
+      if (needsClients) {
+        clientProbe.running = false
+        clientProbe.running = true
+      }
+      root.refreshSpotlight()
+    }
+  }
+
+  Connections {
+    target: root.shell && root.shell.bar ? root.shell.bar : null
+    ignoreUnknownSignals: true
+    function onPositionChanged() { root.refreshSpotlight() }
+    function onBarSizeChanged() { root.refreshSpotlight() }
+    function onBarHiddenChanged() { root.refreshSpotlight() }
+  }
+
   PanelWindow {
     id: panel
     visible: root.panelVisible
@@ -800,6 +1081,8 @@ Item {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: root.panelVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
+    onWidthChanged: root.refreshSpotlight()
+    onHeightChanged: root.refreshSpotlight()
     mask: Region {
       x: root.paused ? card.x : 0
       y: root.paused ? card.y : 0
@@ -808,10 +1091,69 @@ Item {
     }
 
     Rectangle {
+      id: fullScrim
       anchors.fill: parent
       color: root.scrim
-      opacity: root.paused ? 0 : 1
+      visible: !root.holeActive
+      opacity: (root.paused && !root.holeActive) ? 0 : 1
       Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    }
+
+    Item {
+      id: holeScrim
+      anchors.fill: parent
+      visible: root.holeActive
+      opacity: (root.paused && !root.holeActive) ? 0 : 1
+      Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+      Rectangle {
+        x: 0
+        y: 0
+        width: parent.width
+        height: Math.max(0, root.holeY)
+        color: root.dimScrim
+      }
+      Rectangle {
+        x: 0
+        y: root.holeY + root.holeH
+        width: parent.width
+        height: Math.max(0, parent.height - root.holeY - root.holeH)
+        color: root.dimScrim
+      }
+      Rectangle {
+        x: 0
+        y: root.holeY
+        width: Math.max(0, root.holeX)
+        height: root.holeH
+        color: root.dimScrim
+      }
+      Rectangle {
+        x: root.holeX + root.holeW
+        y: root.holeY
+        width: Math.max(0, parent.width - root.holeX - root.holeW)
+        height: root.holeH
+        color: root.dimScrim
+      }
+
+      Rectangle {
+        id: holeRing
+        x: root.holeX
+        y: root.holeY
+        width: root.holeW
+        height: root.holeH
+        color: "transparent"
+        radius: Math.min(Style.space(8), Math.floor(Math.min(width, height) / 6))
+        border.width: Math.max(2, Style.space(2))
+        border.color: Color.accent
+        opacity: 1
+
+        SequentialAnimation on opacity {
+          running: root.holeActive && !(root.paused && !root.holeActive)
+          loops: Animation.Infinite
+          NumberAnimation { to: 0.42; duration: 900; easing.type: Easing.InOutSine }
+          NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
+        }
+      }
     }
 
     MouseArea {

@@ -12,7 +12,7 @@ const {
   allSteps, stepsFor, stepAt, lastIndex, progressLabel, matches, nextIndex, isLast,
   prevIndex, parseState, serializeState, enterAction, normalizeLength, lengthFromKey,
   lengthMeta, lengthLabel, chipNudge, canPractice, knownDiagrams, demoCommand,
-  overviewItems
+  overviewItems, parseSpotlight, parseSpotlights, spotlightValid
 } = sandbox
 
 assert.strictEqual(sandbox.lengthIds().join(","), "short,standard,extensive")
@@ -175,9 +175,27 @@ assert.ok(recap.every(item => item.title && item.keys))
 assert.ok(recap.some(item => item.keys.indexOf("Super + Space") !== -1))
 assert.ok(!recap.some(item => item.title === "That was the Omarchy tour"))
 
+assert.strictEqual(parseSpotlight("none").kind, "none")
+assert.strictEqual(parseSpotlight("bar").kind, "bar")
+assert.strictEqual(parseSpotlight("windows").kind, "windows")
+assert.strictEqual(parseSpotlight("desktop").kind, "desktop")
+assert.strictEqual(parseSpotlight("layer:omarchy.menu").kind, "layer")
+assert.strictEqual(parseSpotlight("layer:omarchy.menu").id, "omarchy.menu")
+assert.strictEqual(parseSpotlight("app:new").kind, "app")
+assert.strictEqual(parseSpotlights("windows,desktop").length, 2)
+assert.strictEqual(parseSpotlights("layer:omarchy.menu,app:org.omarchy.agent,desktop").length, 3)
+assert.strictEqual(parseSpotlight("chip:omarchy.workspaces").kind, "chip")
+assert.strictEqual(parseSpotlight("chip:omarchy.workspaces").id, "omarchy.workspaces")
+assert.strictEqual(parseSpotlight("chip:").kind, "none")
+assert.strictEqual(stepsFor("standard").find(s => s.id === "bar").spotlight, "bar")
+assert.ok(String(stepsFor("short").find(s => s.id === "tiling").spotlight).indexOf("windows") === 0)
+assert.strictEqual(stepsFor("short").find(s => s.id === "menu").spotlight, "layer:omarchy.menu")
+assert.strictEqual(stepsFor("short").find(s => s.id === "workspaces").spotlight, "chip:omarchy.workspaces")
+assert.ok(String(stepAt("short", lastIndex("short")).spotlight).indexOf("chip:") === 0)
+
 for (const step of allSteps()) {
   assert.ok(step.title && step.body, step.id + " needs copy")
-  assert.ok(["none", "top", "center"].indexOf(step.spotlight) !== -1, step.id + " spotlight")
+  assert.ok(spotlightValid(step.spotlight), step.id + " spotlight")
   assert.ok(step.tracks && step.tracks.length, step.id + " tracks")
   assert.ok(knownDiagrams().indexOf(step.diagram) !== -1, step.id + " diagram")
 }
