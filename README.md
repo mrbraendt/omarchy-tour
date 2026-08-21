@@ -7,8 +7,8 @@ shortcut to try it. Enter shows you. Escape closes. The **Tour** chip on the
 bar starts it.
 
 Built for people arriving from Ubuntu, macOS, or Windows: there is no dock,
-windows tile instead of floating, and the agent can finish setup when something
-does not work out of the box.
+windows tile instead of floating, and an AI agent can help set up the computer
+if you connect a ChatGPT-style subscription.
 
 Requires [Omarchy Quattro](https://omarchy.org/). No extra packages. No sudo.
 
@@ -37,23 +37,25 @@ omarchy plugin add "$PWD" --enable
 ## Usage
 
 **Tour of Omarchy**: **1** Short, **2** Standard, **3** Extensive. Enter starts
-Standard.
+Standard. Esc below the three choices closes the tour.
 
-Window lessons run as one block. Two numbered demo windows appear for tiling,
-move, snap, resize, and pop-out, then close so you can look at the rest of the
-desktop again.
+Window lessons open Files, the browser, and a terminal first, then teach tiling
+on those windows. Super + W closes them so you finish on the same desktop you
+started with. The tour card stays out of the way: you can click windows and
+use Super + W while those lessons are on screen.
 
 | Key | Action |
 | --- | --- |
 | ← → or the arrow buttons | Previous / next lesson |
 | The keys on the card | Try the feature |
 | Enter | Show me / continue / recap / finish |
+| ↑ ↓ or Page Up/Down | Scroll the shortcut recap |
 | Escape | Close |
 
 | Length | What you get |
 | --- | --- |
-| Short | Menu, tiling, workspaces, files, agent |
-| Standard | Plus move, snap, terminal, browser, two monitors, bar, clipboard |
+| Short | Menu, Files, browser, terminal, tiling, close, bar, workspaces, AI agent |
+| Standard | Plus move, snap, bar center/right, two monitors, clipboard |
 | Extensive | Plus resize, pop-out, every shortcut, themes |
 
 ```sh

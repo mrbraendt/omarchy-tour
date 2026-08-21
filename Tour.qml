@@ -23,8 +23,10 @@ Item {
   property int keyBeat: 0
   property int highlightedLength: 1
   property bool practiced: false
-  property bool spawnedDemos: false
   property bool overviewing: false
+  property bool captureLaunches: false
+  property var baselineAddresses: []
+  property var trackedAddresses: []
   property bool slideEnabled: true
   property bool hasAgent: true
   property bool isLaptop: true
@@ -34,14 +36,18 @@ Item {
   readonly property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/tour.json"
   property int monitorCount: 2
   property int clientCount: 2
+  property string kbLayout: "us"
+  property string resizeLeftSym: "minus"
+  property string resizeRightSym: "equal"
   readonly property var lengthOptions: TourModel.lengthMeta(root.trackOpts())
   readonly property int stepTotal: TourModel.stepsFor(root.lengthId, root.trackOpts()).length
   readonly property bool canGoBack: !root.choosing && root.stepIndex > 0
   readonly property bool canGoForward: !root.choosing && root.stepIndex < Math.max(0, root.stepTotal - 1)
   readonly property bool onLast: !root.choosing && TourModel.isLast(root.lengthId, root.stepIndex, root.trackOpts())
   readonly property string diagramKind: (!root.choosing && root.step && root.step.diagram) ? String(root.step.diagram) : "none"
-  readonly property bool showHints: root.choosing || root.stepIndex === 0 || root.onLast
+  readonly property bool showHints: !root.choosing && (root.stepIndex === 0 || root.onLast)
   readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.trackOpts())
+  readonly property bool letThrough: !root.choosing && !!(root.step && root.step.letThrough)
   readonly property var spotlight: TourModel.parseSpotlight(root.step && root.step.spotlight)
   readonly property var spotlightTargets: TourModel.parseSpotlights(root.step && root.step.spotlight)
   property color dimScrim: Util.alpha(Color.background, 0.58)
@@ -133,7 +139,27 @@ Item {
         return root.padRect(rect, pad)
       if (!fallback) fallback = rect
     }
-    return root.padRect(fallback, pad)
+    return fallback ? root.padRect(fallback, pad) : null
+  }
+
+  function barSectionRect(region) {
+    var bar = root.shell && root.shell.bar ? root.shell.bar : null
+    if (!bar || !bar.moduleSlots || !region) return null
+    var overlay = root.overlayScreen()
+    var rects = []
+    for (var i = 0; i < bar.moduleSlots.length; i++) {
+      var slot = bar.moduleSlots[i]
+      if (!slot || String(slot.region || "") !== String(region)) continue
+      if (!slot.visible || slot.width < 4 || slot.height < 4) continue
+      var win = typeof bar.slotWindow === "function" ? bar.slotWindow(slot) : null
+      if (win && overlay && !root.sameScreen(win.screen, overlay)) continue
+      var point = { x: slot.x, y: slot.y }
+      try { point = slot.mapToItem(null, 0, 0) } catch (e) {}
+      if (win && typeof bar.windowScreenPoint === "function")
+        point = bar.windowScreenPoint(point, win)
+      rects.push({ x: point.x, y: point.y, width: slot.width, height: slot.height })
+    }
+    return root.unionRects(rects)
   }
 
   function desktopRect() {
@@ -199,6 +225,7 @@ Item {
   function rectForTarget(target) {
     if (!target) return null
     if (target.kind === "bar") return root.barEdgeRect()
+    if (target.kind === "bar-section") return root.barSectionRect(target.id)
     if (target.kind === "chip") return root.chipRect(target.id)
     if (target.kind === "windows") return root.unionRects(root.demoClientRects)
     if (target.kind === "desktop") return root.desktopRect()
@@ -286,6 +313,7 @@ Item {
     var demos = []
     var fresh = []
     var byClass = ({})
+    var added = []
     if (data && data.length) {
       for (var i = 0; i < data.length; i++) {
         var client = data[i]
@@ -293,20 +321,61 @@ Item {
         n++
         var rect = root.clientLocalRect(client)
         var cls = String(client.class || "")
+        var addr = client.address ? String(client.address) : ""
         if (cls === "io.github.julio.tour.demo" && rect) demos.push(rect)
-        if (rect && client.address && !root.addressKnown(String(client.address))) fresh.push(rect)
+        if (rect && addr && !root.addressKnown(addr)) fresh.push(rect)
         if (rect && cls) {
           if (!byClass[cls]) byClass[cls] = []
           byClass[cls].push(rect)
         }
+        if (root.captureLaunches && addr && !root.addressIn(root.baselineAddresses, addr)
+            && !root.addressIn(root.trackedAddresses, addr) && !root.addressIn(added, addr))
+          added.push(addr)
       }
     }
-    if (root.spawnedDemos) n = Math.max(n, 2)
     root.clientCount = n
     root.demoClientRects = demos
     root.newClientRects = fresh
     root.classClientRects = byClass
+    if (added.length) {
+      var nextTracked = []
+      var existing = root.trackedAddresses || []
+      for (var t = 0; t < existing.length; t++) nextTracked.push(existing[t])
+      for (var a = 0; a < added.length; a++) nextTracked.push(added[a])
+      root.trackedAddresses = nextTracked
+    }
     root.refreshSpotlight()
+  }
+
+  function addressIn(list, addr) {
+    if (!list || !list.length) return false
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i]) === String(addr)) return true
+    }
+    return false
+  }
+
+  function beginLaunchTracking() {
+    if (root.captureLaunches) return
+    var addrs = []
+    var data = root.lastClientData || []
+    for (var i = 0; i < data.length; i++) {
+      if (data[i] && data[i].address) addrs.push(String(data[i].address))
+    }
+    root.baselineAddresses = addrs
+    root.trackedAddresses = []
+    root.captureLaunches = true
+  }
+
+  function closeTrackedWindows() {
+    var addrs = root.trackedAddresses || []
+    root.captureLaunches = false
+    root.trackedAddresses = []
+    for (var i = 0; i < addrs.length; i++) {
+      var a = String(addrs[i]).replace(/^address:/, "")
+      if (!a.length) continue
+      Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.window.close({ window = \"address:" + a + "\" })"])
+    }
   }
 
   function trackOpts() {
@@ -314,7 +383,10 @@ Item {
       monitors: root.skipSnapshot ? root.skipSnapshot.monitors : root.monitorCount,
       clients: root.clientCount,
       hasAgent: root.skipSnapshot ? root.skipSnapshot.hasAgent : root.hasAgent,
-      laptop: root.skipSnapshot ? root.skipSnapshot.laptop : root.isLaptop
+      laptop: root.skipSnapshot ? root.skipSnapshot.laptop : root.isLaptop,
+      kbLayout: root.kbLayout,
+      resizeLeft: root.resizeLeftSym,
+      resizeRight: root.resizeRightSym
     }
   }
 
@@ -365,6 +437,9 @@ Item {
     laptopProbe.running = true
     agentProbe.running = false
     agentProbe.running = true
+    keymapProbe.command = ["python3", root.pluginFile("tour-keymap.py")]
+    keymapProbe.running = false
+    keymapProbe.running = true
   }
 
   Component.onCompleted: root.probeAll()
@@ -373,6 +448,20 @@ Item {
   onOverviewingChanged: root.refreshSpotlight()
   onChoosingChanged: root.refreshSpotlight()
   onOpenedChanged: if (root.opened) Qt.callLater(root.refreshSpotlight)
+  onResizeLeftSymChanged: root.refreshResizeCopy()
+  onResizeRightSymChanged: root.refreshResizeCopy()
+
+  function refreshResizeCopy() {
+    if (root.choosing || !root.step || root.step.id !== "resize") return
+    var next = TourModel.stepAt(root.lengthId, root.stepIndex, root.trackOpts())
+    if (!next) return
+    root.step = next
+    var caps = []
+    if (next.keycaps) {
+      for (var i = 0; i < next.keycaps.length; i++) caps.push(next.keycaps[i])
+    }
+    root.keycaps = caps
+  }
 
   function refocus() {
     Qt.callLater(function() {
@@ -388,18 +477,9 @@ Item {
     stateFile.setText(TourModel.serializeState(current.completed, current.length, current.skipped, true))
   }
 
-  function resetDemoWindows() {
-    if (!root.spawnedDemos) return
-    Quickshell.execDetached(["bash", root.pluginFile("tour-demo.sh"), "reset"])
-  }
-
-  function syncDemoWindows(step) {
-    if (step && step.needsWindows) {
-      if (root.spawnedDemos) root.resetDemoWindows()
-      else root.ensureDemoWindows()
-    } else {
-      root.cleanupDemos()
-    }
+  function syncWindowLesson(prev, next) {
+    if (next && next.trackLaunches) root.beginLaunchTracking()
+    if (prev && prev.letThrough && next && !next.letThrough) root.closeTrackedWindows()
   }
 
   function execTourCommand(cmd) {
@@ -411,20 +491,6 @@ Item {
       out.unshift("bash")
     }
     Quickshell.execDetached(out)
-  }
-
-  function ensureDemoWindows() {
-    if (root.spawnedDemos) return
-    Quickshell.execDetached(["bash", root.pluginFile("tour-demo.sh"), "spawn", "2"])
-    root.spawnedDemos = true
-    root.clientCount = Math.max(root.clientCount, 2)
-    demoProbeTimer.restart()
-  }
-
-  function cleanupDemos() {
-    if (!root.spawnedDemos) return
-    root.spawnedDemos = false
-    Quickshell.execDetached(["bash", root.pluginFile("tour-demo.sh"), "close"])
   }
 
   function open(payloadJson) {
@@ -460,7 +526,7 @@ Item {
     root.practiced = false
     root.overviewing = false
     root.opened = false
-    root.cleanupDemos()
+    root.closeTrackedWindows()
     root.runLights(["restore"])
   }
 
@@ -471,7 +537,7 @@ Item {
     root.practiced = false
     root.overviewing = false
     root.opened = false
-    root.cleanupDemos()
+    root.closeTrackedWindows()
     root.runLights(["restore"])
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide(root.pluginId)
@@ -488,6 +554,9 @@ Item {
       hasAgent: root.hasAgent,
       laptop: root.isLaptop
     }
+    root.captureLaunches = false
+    root.trackedAddresses = []
+    root.baselineAddresses = []
     root.lengthId = TourModel.normalizeLength(id)
     root.choosing = false
     root.paused = false
@@ -495,6 +564,7 @@ Item {
   }
 
   function loadStep(index) {
+    var prev = root.step
     var next = TourModel.stepAt(root.lengthId, index, root.trackOpts())
     var caps = []
     if (next && next.keycaps) {
@@ -509,7 +579,7 @@ Item {
     root.step = next
     root.keycaps = caps
     root.keyBeat = 0
-    root.syncDemoWindows(next)
+    root.syncWindowLesson(prev, next)
     root.refocus()
     Qt.callLater(root.refreshSpotlight)
   }
@@ -578,7 +648,7 @@ Item {
       root.syncLights()
       root.execTourCommand(cmd)
     }
-    practiceTimer.interval = (root.step && root.step.needsWindows)
+    practiceTimer.interval = (root.step && root.step.letThrough)
       ? Math.max(1200, Number(root.step.resumeMs) || 1600)
       : 850
     practiceTimer.restart()
@@ -608,6 +678,15 @@ Item {
     root.dismiss()
   }
 
+  function scrollRecap(delta) {
+    if (!recapFlick.visible) return
+    var maxY = Math.max(0, recapFlick.contentHeight - recapFlick.height)
+    var y = recapFlick.contentY + delta
+    if (y < 0) y = 0
+    if (y > maxY) y = maxY
+    recapFlick.contentY = y
+  }
+
   function eventFromQt(event) {
     var name = ""
     if (event.key === Qt.Key_Escape) name = "Escape"
@@ -620,9 +699,14 @@ Item {
     else if (event.key === Qt.Key_Down) name = "Down"
     else if (event.key === Qt.Key_Minus) name = "Minus"
     else if (event.key === Qt.Key_Equal) name = "Equal"
+    else if (event.key === Qt.Key_PageUp) name = "PageUp"
+    else if (event.key === Qt.Key_PageDown) name = "PageDown"
+    else if (event.key === Qt.Key_ssharp) name = "ß"
+    else if (event.key === Qt.Key_Dead_Acute || event.key === Qt.Key_acute) name = "´"
     else if (event.key === Qt.Key_Print) name = "Print"
     else if (event.key >= Qt.Key_0 && event.key <= Qt.Key_9) name = String(event.key - Qt.Key_0)
     else if (event.key >= Qt.Key_A && event.key <= Qt.Key_Z) name = String.fromCharCode(event.key)
+    else if (event.text && String(event.text).length === 1 && String(event.text) !== " ") name = String(event.text)
     return {
       key: name,
       meta: !!(event.modifiers & Qt.MetaModifier),
@@ -975,7 +1059,7 @@ Item {
           root.ingestClients(JSON.parse(text))
         } catch (e) {
           root.demoClientRects = []
-          if (!root.spawnedDemos) root.clientCount = 0
+          root.clientCount = 0
           if (root.spotlightTargets.length) root.refreshSpotlight()
         }
       }
@@ -997,6 +1081,22 @@ Item {
       waitForEnd: true
       onStreamFinished: {
         root.hasAgent = String(text).replace(/^\s+|\s+$/g, "").length > 0
+      }
+    }
+  }
+
+  Process {
+    id: keymapProbe
+    command: ["python3", "-c", "print('{}')"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var data = JSON.parse(text)
+          if (data.layout) root.kbLayout = String(data.layout)
+          if (data.code20) root.resizeLeftSym = String(data.code20)
+          if (data.code21) root.resizeRightSym = String(data.code21)
+        } catch (e) {}
       }
     }
   }
@@ -1079,15 +1179,17 @@ Item {
     color: "transparent"
     WlrLayershell.namespace: "omarchy-tour"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.panelVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: !root.panelVisible
+      ? WlrKeyboardFocus.None
+      : ((root.letThrough || root.paused) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
     exclusionMode: ExclusionMode.Ignore
     onWidthChanged: root.refreshSpotlight()
     onHeightChanged: root.refreshSpotlight()
     mask: Region {
-      x: root.paused ? card.x : 0
-      y: root.paused ? card.y : 0
-      width: root.paused ? card.width : panel.width
-      height: root.paused ? card.height : panel.height
+      x: (root.paused || root.letThrough) ? card.x : 0
+      y: (root.paused || root.letThrough) ? card.y : 0
+      width: (root.paused || root.letThrough) ? card.width : panel.width
+      height: (root.paused || root.letThrough) ? card.height : panel.height
     }
 
     Rectangle {
@@ -1158,7 +1260,7 @@ Item {
 
     MouseArea {
       anchors.fill: parent
-      enabled: !root.paused
+      enabled: !root.paused && !root.letThrough
       onClicked: {}
     }
 
@@ -1411,6 +1513,19 @@ Item {
           font.pixelSize: Style.font.displayLarge
           font.bold: true
           wrapMode: Text.WordWrap
+          horizontalAlignment: Text.AlignHCenter
+        }
+
+        Text {
+          width: parent.width
+          visible: root.choosing
+          text: "Select tour and press Enter"
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.heading
+          font.bold: true
+          wrapMode: Text.WordWrap
+          horizontalAlignment: Text.AlignHCenter
         }
 
         Column {
@@ -1425,7 +1540,7 @@ Item {
               required property int index
               readonly property bool selected: root.highlightedLength === lengthRow.index
               width: inner.width
-              height: Math.max(Style.space(72), lengthCopy.implicitHeight + Style.space(28))
+              height: Math.max(Style.space(56), lengthLabel.implicitHeight + Style.space(24))
               radius: Math.min(root.cornerRadius, Style.space(14))
               color: lengthRow.selected ? Util.alpha(Color.accent, 0.16) : Util.alpha(root.foreground, 0.04)
               border.width: lengthRow.selected ? Math.max(1, Style.space(1)) : 0
@@ -1445,28 +1560,16 @@ Item {
                   anchors.verticalCenter: parent.verticalCenter
                 }
 
-                Column {
-                  id: lengthCopy
+                Text {
+                  id: lengthLabel
                   anchors.verticalCenter: parent.verticalCenter
                   width: parent.width - Style.space(26)
-                  spacing: Style.space(4)
-                  Text {
-                    width: parent.width
-                    text: lengthRow.modelData.label
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.heading
-                    font.bold: true
-                    wrapMode: Text.WordWrap
-                  }
-                  Text {
-                    width: parent.width
-                    text: lengthRow.modelData.detail
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    wrapMode: Text.WordWrap
-                  }
+                  text: lengthRow.modelData.label
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.heading
+                  font.bold: true
+                  wrapMode: Text.WordWrap
                 }
               }
 
@@ -1481,20 +1584,59 @@ Item {
           }
         }
 
+        Column {
+          visible: root.choosing
+          width: parent.width
+          spacing: Style.space(4)
+
+          Rectangle {
+            id: escBtn
+            width: Math.max(Style.space(52), escLabel.implicitWidth + Style.space(20))
+            height: Style.space(36)
+            radius: Math.min(root.cornerRadius, Style.space(10))
+            color: Util.alpha(root.foreground, 0.08)
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            Text {
+              id: escLabel
+              anchors.centerIn: parent
+              text: "Esc"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.onEscape()
+            }
+          }
+
+          Text {
+            width: parent.width
+            text: "close tour"
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            horizontalAlignment: Text.AlignHCenter
+          }
+        }
+
         Text {
           width: parent.width
           visible: root.showHints
-          text: root.choosing
-            ? "1  2  3  to choose     Enter  to begin     Esc  to close"
-            : (root.overviewing
-              ? "Enter  to finish     Esc  to close"
-              : (TourModel.enterAction(root.step) === "overview"
-                ? "Enter  to see the shortcuts     Esc  to close"
-                : (TourModel.enterAction(root.step) === "finish"
-              ? "Enter  to finish     Esc  to close"
-              : (root.step && root.step.keys && root.step.keys.length
-                ? "←  →  lessons     Enter  to show me     Esc  to close"
-                : "←  →  lessons     Enter  to continue     Esc  to close"))))
+          text: root.overviewing
+            ? "↑  ↓  or  Page Up/Down  to scroll     Enter  to finish     Esc  to close"
+            : (TourModel.enterAction(root.step) === "overview"
+              ? "Enter  to see the shortcuts     Esc  to close"
+              : (TourModel.enterAction(root.step) === "finish"
+            ? "Enter  to finish     Esc  to close"
+            : (root.step && root.step.keys && root.step.keys.length
+              ? "←  →  lessons     Enter  to show me     Esc  to close"
+              : "←  →  lessons     Enter  to continue     Esc  to close")))
           color: Color.muted
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
@@ -1521,6 +1663,16 @@ Item {
         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
             && !(event.modifiers & (Qt.MetaModifier | Qt.AltModifier | Qt.ControlModifier | Qt.ShiftModifier))) {
           root.onEnter()
+          event.accepted = true
+          return
+        }
+        if (root.overviewing && (event.key === Qt.Key_Down || event.key === Qt.Key_PageDown)) {
+          root.scrollRecap(event.key === Qt.Key_PageDown ? Math.max(Style.space(80), recapFlick.height * 0.85) : Style.space(48))
+          event.accepted = true
+          return
+        }
+        if (root.overviewing && (event.key === Qt.Key_Up || event.key === Qt.Key_PageUp)) {
+          root.scrollRecap(-(event.key === Qt.Key_PageUp ? Math.max(Style.space(80), recapFlick.height * 0.85) : Style.space(48)))
           event.accepted = true
           return
         }
@@ -1561,7 +1713,12 @@ Item {
           event.accepted = true
           return
         }
-        event.accepted = true
+        if (ev.meta && !ev.alt && !ev.ctrl && !ev.shift && ev.key === "W") {
+          root.execTourCommand(["hyprctl", "dispatch", "hl.dsp.window.close()"])
+          event.accepted = true
+          return
+        }
+        event.accepted = !(root.letThrough || root.paused)
       }
     }
   }
