@@ -9,7 +9,8 @@ function allSteps() {
     {
       id: "menu",
       title: "The menu",
-      body: "Super + Space opens every app and setting. There is no row of icons along the bottom of the screen.",
+      body: "Super + Space opens every app and setting.",
+      section: "apps",
       keys: [{ key: "Space", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "Space"],
       spotlight: "layer:omarchy.menu",
@@ -25,12 +26,12 @@ function allSteps() {
       body: "Super + Shift + F opens your folders — documents, photos, downloads. You can also type Files in the menu.",
       keys: [{ key: "F", meta: true, alt: false, ctrl: false, shift: true }],
       keycaps: ["Super", "Shift", "F"],
-      spotlight: "app:new,desktop",
+      section: "apps",
+      spotlight: "none",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-nautilus"] },
       resumeMs: 3500,
-      letThrough: true,
       trackLaunches: true,
       tracks: ["short", "standard", "extensive"]
     },
@@ -38,14 +39,14 @@ function allSteps() {
       id: "browser",
       title: "The browser",
       body: "Super + Shift + Return opens the web browser. It shares the screen with whatever is already open.",
+      section: "apps",
       keys: [{ key: "Enter", meta: true, alt: false, ctrl: false, shift: true }],
       keycaps: ["Super", "Shift", "Return"],
-      spotlight: "app:new,desktop",
+      spotlight: "none",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-browser"] },
       resumeMs: 2500,
-      letThrough: true,
       trackLaunches: true,
       tracks: ["short", "standard", "extensive"]
     },
@@ -53,24 +54,40 @@ function allSteps() {
       id: "terminal",
       title: "The terminal",
       body: "Super + Return opens a terminal. Useful if you are a programmer. Most people can skip this later and still use Omarchy just fine.",
+      section: "apps",
       keys: [{ key: "Enter", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "Return"],
-      spotlight: "app:new,desktop",
+      spotlight: "none",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-terminal"] },
       resumeMs: 2500,
-      letThrough: true,
       trackLaunches: true,
       tracks: ["short", "standard", "extensive"]
     },
     {
+      id: "windows-ahead",
+      title: "Window Management in Omarchy",
+      body: "Opened windows share the screen instead of stacking. The next cards show how to move, swap, float, and close them.",
+      section: "windows",
+      kind: "title",
+      keys: [],
+      keycaps: [],
+      spotlight: "none",
+      diagram: "none",
+      enter: "continue",
+      demo: null,
+      resumeMs: 0,
+      tracks: ["short", "standard", "extensive"]
+    },
+    {
       id: "tiling",
-      title: "Windows tile, they don't float",
-      body: "Those three windows split the screen and fill the gaps. That is tiling. Super + T floats the selected window and you can drag it anywhere with your mouse or touchpad.",
+      title: "Windows tile, don't float",
+      body: "Opened windows split the screen and fill the gaps. That is tiling. Super + T floats the selected window and you can drag it anywhere with your mouse or touchpad.",
+      section: "windows",
       keys: [{ key: "T", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.window.float({ action = \"toggle\" })"] }],
       keycaps: ["Super", "T"],
-      spotlight: "desktop",
+      spotlight: "none",
       diagram: "tiling",
       enter: "demo",
       demo: { command: ["hyprctl", "dispatch", "hl.dsp.window.float({ action = \"toggle\" })"] },
@@ -82,9 +99,10 @@ function allSteps() {
       id: "move",
       title: "Move and resize with Super",
       body: "Click a window, then hold Super and left-click drag to move it. Super and right-click drag resizes the split.",
+      section: "windows",
       keys: [],
       keycaps: ["Super", "Mouse L", "Mouse R"],
-      spotlight: "desktop",
+      spotlight: "none",
       diagram: "move",
       enter: "continue",
       demo: null,
@@ -96,6 +114,7 @@ function allSteps() {
       id: "snap",
       title: "Snap by swapping tiles",
       body: "Click a window, then Super + arrows to jump to the next one. Super + Shift + arrows swaps their places. That is how you rearrange tiled windows — they do not snap to half the screen.",
+      section: "windows",
       keys: [
         { key: "Left", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.focus({ direction = \"l\" })"] },
         { key: "Right", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.focus({ direction = \"r\" })"] },
@@ -107,7 +126,7 @@ function allSteps() {
         { key: "Down", meta: true, alt: false, ctrl: false, shift: true, command: ["hyprctl", "dispatch", "hl.dsp.window.swap({ direction = \"d\" })"] }
       ],
       keycaps: ["Super", "Shift", "Left"],
-      spotlight: "desktop",
+      spotlight: "none",
       diagram: "snap",
       enter: "demo",
       demo: { command: ["hyprctl", "dispatch", "hl.dsp.window.swap({ direction = \"l\" })"] },
@@ -118,6 +137,7 @@ function allSteps() {
     {
       id: "resize",
       title: "Resize the split from the keyboard",
+      section: "windows",
       body: "Super and the two keys to the right of 0 grow or shrink the focused tile. Super + right-click drag does the same with the mouse.",
       keys: [
         { key: "Minus", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.window.resize({ x = -100, y = 0, relative = true })"] },
@@ -126,7 +146,7 @@ function allSteps() {
         { key: "´", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.window.resize({ x = 100, y = 0, relative = true })"] }
       ],
       keycaps: ["Super", "-", "="],
-      spotlight: "desktop",
+      spotlight: "none",
       diagram: "resize",
       enter: "demo",
       demo: { command: ["hyprctl", "dispatch", "hl.dsp.window.resize({ x = -100, y = 0, relative = true })"] },
@@ -137,10 +157,11 @@ function allSteps() {
     {
       id: "float",
       title: "Pop a window out",
+      section: "windows",
       body: "Super + O pops a window out so it stays on top — handy for a video or a calculator. Super + T just lets you drag a window freely.",
       keys: [{ key: "O", meta: true, alt: false, ctrl: false, shift: false, command: ["omarchy-hyprland-window-pop"] }],
       keycaps: ["Super", "O"],
-      spotlight: "desktop",
+      spotlight: "none",
       diagram: "float",
       enter: "demo",
       demo: { command: ["omarchy-hyprland-window-pop"] },
@@ -149,12 +170,29 @@ function allSteps() {
       tracks: ["extensive"]
     },
     {
+      id: "demo-offer",
+      title: "Help with two or more windows",
+      body: "Need two windows to try this? Press Enter, then use the shortcuts below.",
+      section: "windows",
+      keys: [],
+      keycaps: ["Enter (spawn two windows)"],
+      spotlight: "none",
+      diagram: "none",
+      enter: "demo",
+      demo: { command: ["tour-demo", "spawn", "2"] },
+      resumeMs: 2500,
+      letThrough: true,
+      trackLaunches: true,
+      tracks: ["short", "standard", "extensive"]
+    },
+    {
       id: "close",
       title: "Close a window",
-      body: "Super + W closes the focused window. Click the window first if you need to pick which one. Close Files, the browser, and the terminal you opened so you are back where you started.",
+      body: "Super + W closes the selected window. Click a window first if you need to pick which one.",
+      section: "windows",
       keys: [{ key: "W", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.window.close()"] }],
       keycaps: ["Super", "W"],
-      spotlight: "desktop",
+      spotlight: "none",
       diagram: "none",
       enter: "demo",
       demo: { command: ["hyprctl", "dispatch", "hl.dsp.window.close()"] },
@@ -166,6 +204,8 @@ function allSteps() {
       id: "bar",
       title: "The bar",
       body: "This strip along the edge of the screen is the bar — time, wifi, and volume live here. Drag it to another edge if you like. Double-click empty space to toggle transparency. Click Tour anytime to replay this walkthrough.",
+      section: "bar",
+      kind: "title",
       keys: [],
       keycaps: [],
       spotlight: "bar",
@@ -177,8 +217,9 @@ function allSteps() {
     },
     {
       id: "workspaces",
-      title: "Workspaces, one stack per screen",
+      title: "The bar: workspaces",
       body: "The numbered pills on the left of the bar are workspaces — extra screens for grouping windows. Super + Tab walks them. Super + 1 through 0 jumps to one. Super + Shift + a number takes the currently selected window (for example your browser) with you.",
+      section: "bar",
       keys: [
         { key: "Tab", meta: true, alt: false, ctrl: false, shift: false },
         { key: "1", meta: true, alt: false, ctrl: false, shift: false }
@@ -193,8 +234,9 @@ function allSteps() {
     },
     {
       id: "bar-center",
-      title: "The middle of the bar",
+      title: "The bar: middle section",
       body: "The middle of the bar is the clock, weather, and a few status icons. Click the clock for the calendar. Click weather for the forecast.",
+      section: "bar",
       keys: [],
       keycaps: [],
       spotlight: "bar-section:center",
@@ -206,8 +248,9 @@ function allSteps() {
     },
     {
       id: "bar-right",
-      title: "The right of the bar",
+      title: "The bar: the other end",
       body: "The right side is wifi, volume, bluetooth, and power. Click a chip to change it — the same kinds of controls you would look for in the bottom-right on Windows or the top-right on a Mac.",
+      section: "bar",
       keys: [],
       keycaps: [],
       spotlight: "bar-section:right",
@@ -218,23 +261,42 @@ function allSteps() {
       tracks: ["standard", "extensive"]
     },
     {
-      id: "monitors",
-      title: "Two monitors",
-      body: "Ctrl + Alt + Tab jumps to the other screen. Super + Shift + Alt + Left or Right moves a whole workspace onto that monitor.",
-      keys: [{ key: "Tab", meta: false, alt: true, ctrl: true, shift: false }],
-      keycaps: ["Ctrl", "Alt", "Tab"],
+      id: "extras-ahead",
+      title: "A few extras",
+      body: "The rest is optional. Skip anything you do not need.",
+      section: "extras",
+      kind: "title",
+      keys: [],
+      keycaps: [],
       spotlight: "none",
-      diagram: "monitors",
+      diagram: "none",
+      enter: "continue",
+      demo: null,
+      resumeMs: 0,
+      tracks: ["short", "standard", "extensive"]
+    },
+    {
+      id: "theme",
+      title: "Look and background",
+      body: "Super + Ctrl + Space picks a background. Super + Shift + Ctrl + Space opens themes.",
+      section: "extras",
+      keys: [
+        { key: "Space", meta: true, alt: false, ctrl: true, shift: false },
+        { key: "Space", meta: true, alt: false, ctrl: true, shift: true }
+      ],
+      keycaps: ["Super", "Ctrl", "Space"],
+      spotlight: "layer:omarchy.menu",
+      diagram: "none",
       enter: "demo",
-      demo: { command: ["hyprctl", "dispatch", "hl.dsp.focus({ monitor = \"+1\" })"] },
-      resumeMs: 2000,
-      minMonitors: 2,
+      demo: { command: ["omarchy-menu", "toggle", "background"] },
+      resumeMs: 4000,
       tracks: ["standard", "extensive"]
     },
     {
       id: "clipboard",
       title: "Clipboard history",
       body: "Super + Ctrl + V pastes from history, including images. Sensitive copies stay out of the list.",
+      section: "extras",
       keys: [{ key: "V", meta: true, alt: false, ctrl: true, shift: false }],
       keycaps: ["Super", "Ctrl", "V"],
       spotlight: "layer:omarchy.clipboard",
@@ -248,9 +310,10 @@ function allSteps() {
       id: "agent",
       title: "Ask the AI agent",
       body: "If you connect a subscription such as ChatGPT, Claude, or Gemini in the menu under Setup → Defaults → Agent, that AI agent can help set up this computer, fix errors, and install software — you just describe what you need. Super + Shift + Ctrl + A opens it.",
+      section: "extras",
       keys: [{ key: "A", meta: true, alt: false, ctrl: true, shift: true }],
       keycaps: ["Super", "Shift", "Ctrl", "A"],
-      spotlight: "layer:omarchy.menu,app:org.omarchy.agent,desktop",
+      spotlight: "layer:omarchy.menu,app:org.omarchy.agent",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-agent", "--pick"] },
@@ -262,6 +325,7 @@ function allSteps() {
       id: "keybindings",
       title: "Every shortcut",
       body: "Super + K opens every shortcut in a searchable list.",
+      section: "extras",
       keys: [{ key: "K", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "K"],
       spotlight: "layer:omarchy.menu",
@@ -272,30 +336,30 @@ function allSteps() {
       tracks: ["extensive"]
     },
     {
-      id: "theme",
-      title: "Look and background",
-      body: "Super + Ctrl + Space picks a background. Super + Shift + Ctrl + Space opens themes.",
-      keys: [
-        { key: "Space", meta: true, alt: false, ctrl: true, shift: false },
-        { key: "Space", meta: true, alt: false, ctrl: true, shift: true }
-      ],
-      keycaps: ["Super", "Ctrl", "Space"],
-      spotlight: "layer:omarchy.menu",
-      diagram: "none",
+      id: "monitors",
+      title: "Two monitors",
+      body: "Ctrl + Alt + Tab jumps to the other screen. Super + Shift + Alt + Left or Right moves a whole workspace onto that monitor.",
+      section: "extras",
+      keys: [{ key: "Tab", meta: false, alt: true, ctrl: true, shift: false }],
+      keycaps: ["Ctrl", "Alt", "Tab"],
+      spotlight: "none",
+      diagram: "monitors",
       enter: "demo",
-      demo: { command: ["omarchy-menu", "toggle", "background"] },
-      resumeMs: 4000,
-      tracks: ["extensive"]
+      demo: { command: ["hyprctl", "dispatch", "hl.dsp.focus({ monitor = \"+1\" })"] },
+      resumeMs: 2000,
+      minMonitors: 2,
+      tracks: ["standard", "extensive"]
     },
     {
       id: "done",
       title: "That was the Omarchy tour",
-      body: "Learn in the menu has the full manual. Click Tour on the bar to run this again. Press Enter once for a recap of the shortcuts from this tour.",
+      body: "Click a card below to go back to that lesson. Scroll down to see the rest.",
+      section: "done",
       keys: [],
       keycaps: [],
       spotlight: "chip:io.github.julio.tour",
       diagram: "none",
-      enter: "overview",
+      enter: "finish",
       demo: null,
       resumeMs: 0,
       tracks: ["short", "standard", "extensive"]
@@ -477,7 +541,38 @@ function resolveStep(step, opts) {
       keys.push({ key: rightNames[i], meta: true, alt: false, ctrl: false, shift: false, command: rightCmd })
     copy.keys = keys
   }
+  if (step.id === "demo-offer") {
+    copy.keycaps = ["Enter (spawn two windows)"]
+    var rows = [{ caps: ["Super", "T"], does: "Float the selected window, then drag it" }]
+    var length = (opts && opts.tourLength) || ""
+    if (length === "standard" || length === "extensive") {
+      rows.push({ caps: ["Super", "arrows"], does: "Jump to the next tiled window" })
+      rows.push({ caps: ["Super", "Shift", "arrows"], does: "Swap two tiled windows" })
+      rows.push({ caps: ["Super", "Mouse L"], does: "Hold Super and drag to move" })
+    }
+    if (length === "extensive") {
+      rows.push({ caps: ["Super", resizeLeftKey(opts)], does: "Shrink or grow the split" })
+      rows.push({ caps: ["Super", "O"], does: "Keep a window on top" })
+    }
+    copy.practiceCaps = rows
+  }
+  if (step.id === "extras-ahead") {
+    var extraLength = (opts && opts.tourLength) || ""
+    if (extraLength === "short")
+      copy.body = "One extra if you want it: the AI agent, if you connect a subscription."
+    else if (extraLength === "extensive")
+      copy.body = "Look and background, clipboard history, every shortcut, two screens if you have them, and the AI agent."
+    else
+      copy.body = "Look and background, clipboard history, two screens if you have them, and the AI agent."
+  }
   return copy
+}
+
+function launchCountFrom(opts) {
+  if (!opts || opts.launchCount === undefined || opts.launchCount === null || opts.launchCount === "") return 0
+  var n = Number(opts.launchCount)
+  if (!isFinite(n) || n < 0) return 0
+  return n
 }
 
 function stepApplies(step, opts) {
@@ -486,6 +581,7 @@ function stepApplies(step, opts) {
   if (step.minMonitors && monitors < step.minMonitors) return false
   if (step.requiresAgent && !hasAgentFrom(opts)) return false
   if (step.requiresLaptop && !isLaptopFrom(opts)) return false
+  if (step.requiresFewWindows && launchCountFrom(opts) >= 2) return false
   return true
 }
 
@@ -497,7 +593,12 @@ function stepsFor(length, opts) {
     var step = all[i]
     if (!includesLength(step, id)) continue
     if (!stepApplies(step, opts)) continue
-    out.push(resolveStep(step, opts))
+    var merged = {}
+    if (opts) {
+      for (var k in opts) merged[k] = opts[k]
+    }
+    merged.tourLength = id
+    out.push(resolveStep(step, merged))
   }
   return out
 }
@@ -663,6 +764,46 @@ function overviewItems(length, opts) {
     out.push({ title: step.title, keys: keys.join(" + ") })
   }
   return out
+}
+
+function isTitleCard(step) {
+  return !!(step && step.kind === "title")
+}
+
+function sectionLabel(id) {
+  if (id === "apps") return "Open things"
+  if (id === "windows") return "Window management"
+  if (id === "bar") return "The bar"
+  if (id === "extras") return "A few extras"
+  return ""
+}
+
+function overviewGroups(length, opts) {
+  var list = stepsFor(length, opts)
+  var groups = []
+  var current = null
+  for (var i = 0; i < list.length; i++) {
+    var step = list[i]
+    if (!step || step.id === "done" || isTitleCard(step)) continue
+    var sec = step.section || ""
+    if (!current || current.id !== sec) {
+      current = { id: sec, label: sectionLabel(sec), items: [] }
+      groups.push(current)
+    }
+    var keys = ""
+    if (step.keycaps && step.keycaps.length) {
+      var caps = []
+      for (var k = 0; k < step.keycaps.length; k++) caps.push(step.keycaps[k])
+      keys = caps.join(" + ")
+    }
+    current.items.push({
+      id: step.id,
+      title: step.title,
+      keys: keys,
+      index: i
+    })
+  }
+  return groups
 }
 
 function hasKeycaps(step) {

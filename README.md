@@ -48,15 +48,15 @@ use Super + W while those lessons are on screen.
 | --- | --- |
 | ← → or the arrow buttons | Previous / next lesson |
 | The keys on the card | Try the feature |
-| Enter | Show me / continue / recap / finish |
-| ↑ ↓ or Page Up/Down | Scroll the shortcut recap |
+| Enter | Show me / continue / finish |
+| ↑ ↓ or Page Up/Down | Scroll the map on the last card |
 | Escape | Close |
 
 | Length | What you get |
 | --- | --- |
 | Short | Menu, Files, browser, terminal, tiling, close, bar, workspaces, AI agent |
-| Standard | Plus move, snap, bar center/right, two monitors, clipboard |
-| Extensive | Plus resize, pop-out, every shortcut, themes |
+| Standard | Plus move, snap, bar center/right, look and background, two monitors, clipboard |
+| Extensive | Plus resize, pop-out, every shortcut |
 
 ```sh
 omarchy-shell shell toggle io.github.julio.tour '{}'

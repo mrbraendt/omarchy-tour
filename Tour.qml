@@ -47,6 +47,7 @@ Item {
   readonly property string diagramKind: (!root.choosing && root.step && root.step.diagram) ? String(root.step.diagram) : "none"
   readonly property bool showHints: !root.choosing && (root.stepIndex === 0 || root.onLast)
   readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.trackOpts())
+  readonly property var overviewGroups: TourModel.overviewGroups(root.lengthId, root.trackOpts())
   readonly property bool letThrough: !root.choosing && !!(root.step && root.step.letThrough)
   readonly property var spotlight: TourModel.parseSpotlight(root.step && root.step.spotlight)
   readonly property var spotlightTargets: TourModel.parseSpotlights(root.step && root.step.spotlight)
@@ -72,7 +73,9 @@ Item {
   readonly property int cardPad: Math.max(Style.spacing.panelPadding, Style.space(32))
 
   readonly property bool panelVisible: root.opened
-  readonly property bool showKeycaps: !root.choosing && root.nonempty(root.keycaps)
+  readonly property bool titleCard: !root.choosing && !!(root.step && root.step.kind === "title")
+  readonly property bool showKeycaps: !root.choosing && !root.titleCard && root.nonempty(root.keycaps)
+  readonly property var practiceCaps: (root.step && root.step.practiceCaps) ? root.step.practiceCaps : []
 
   function nonempty(list) {
     return !!(list && list.length)
@@ -386,7 +389,8 @@ Item {
       laptop: root.skipSnapshot ? root.skipSnapshot.laptop : root.isLaptop,
       kbLayout: root.kbLayout,
       resizeLeft: root.resizeLeftSym,
-      resizeRight: root.resizeRightSym
+      resizeRight: root.resizeRightSym,
+      launchCount: (root.trackedAddresses && root.trackedAddresses.length) ? root.trackedAddresses.length : 0
     }
   }
 
@@ -579,6 +583,7 @@ Item {
     root.step = next
     root.keycaps = caps
     root.keyBeat = 0
+    root.overviewing = !!(next && next.id === "done")
     root.syncWindowLesson(prev, next)
     root.refocus()
     Qt.callLater(root.refreshSpotlight)
@@ -612,11 +617,14 @@ Item {
 
   function goBack() {
     if (root.choosing || root.stepIndex <= 0) return
-    if (root.overviewing) {
-      root.overviewing = false
-      return
+    var list = TourModel.stepsFor(root.lengthId, root.trackOpts())
+    var currentId = root.step ? root.step.id : ""
+    var here = -1
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === currentId) { here = i; break }
     }
-    root.applyStep(TourModel.prevIndex(root.lengthId, root.stepIndex, root.trackOpts()))
+    if (here < 0) here = root.stepIndex
+    root.applyStep(Math.max(0, here - 1))
   }
 
   function goForward() {
@@ -625,7 +633,20 @@ Item {
       root.onLastEnter()
       return
     }
-    root.applyStep(TourModel.nextIndex(root.lengthId, root.stepIndex, root.trackOpts()))
+    var list = TourModel.stepsFor(root.lengthId, root.trackOpts())
+    var currentId = root.step ? root.step.id : ""
+    var here = -1
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === currentId) { here = i; break }
+    }
+    var next = here >= 0 ? here + 1 : Math.min(root.stepIndex + 1, list.length - 1)
+    if (next > list.length - 1) next = list.length - 1
+    root.applyStep(next)
+  }
+
+  function jumpToLesson(index) {
+    root.overviewing = false
+    root.applyStep(index, true)
   }
 
   function runDemo(step, ev) {
@@ -1196,7 +1217,7 @@ Item {
       id: fullScrim
       anchors.fill: parent
       color: root.scrim
-      visible: !root.holeActive
+      visible: !root.holeActive && root.choosing
       opacity: (root.paused && !root.holeActive) ? 0 : 1
       Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
     }
@@ -1266,21 +1287,31 @@ Item {
 
     BorderSurface {
       id: card
-      width: Math.min(Style.space(620), parent.width - Style.space(56))
+      width: Math.min(root.titleCard ? Style.space(560) : Style.space(620), parent.width - Style.space(56))
       height: inner.implicitHeight + root.cardPad * 2
       radius: root.cornerRadius
-      color: root.background
+      color: root.titleCard ? Util.alpha(Color.accent, 0.12) : root.background
+      clip: true
       borderSpec: root.borderSpec
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
       anchors.bottomMargin: Style.space(48)
+
+      Rectangle {
+        visible: root.titleCard
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: Style.space(10)
+        color: Color.accent
+      }
 
       Column {
         id: inner
         x: root.cardPad
         y: root.cardPad
         width: parent.width - root.cardPad * 2
-        spacing: Style.space(18)
+        spacing: root.titleCard ? Style.space(22) : Style.space(18)
 
         Row {
           visible: !root.choosing
@@ -1352,40 +1383,71 @@ Item {
             Behavior on x { enabled: root.slideEnabled; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             Behavior on opacity { enabled: root.slideEnabled; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-            Item {
+            Column {
               width: parent.width
-              height: Math.max(titleText.implicitHeight, checkMark.height)
+              spacing: root.titleCard ? Style.space(14) : Style.space(8)
 
               Text {
-                id: titleText
-                width: parent.width - (root.practiced ? checkMark.width + Style.space(12) : 0)
-                text: root.step ? root.step.title : ""
-                color: root.foreground
+                width: parent.width
+                visible: root.titleCard
+                text: (root.step && root.step.id === "extras-ahead") ? "Optional" : "Coming up"
+                color: Color.accent
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.displayLarge
+                font.pixelSize: Style.font.bodySmall
                 font.bold: true
-                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
               }
 
-              Rectangle {
-                id: checkMark
-                anchors.right: parent.right
-                anchors.verticalCenter: titleText.verticalCenter
-                width: Style.space(28)
-                height: Style.space(28)
-                radius: width / 2
-                color: Color.accent
-                visible: root.practiced
-                opacity: root.practiced ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 160 } }
+              Item {
+                width: parent.width
+                height: Math.max(titleText.implicitHeight, checkMark.height)
 
                 Text {
-                  anchors.centerIn: parent
-                  text: "✓"
-                  color: root.background
+                  id: titleText
+                  width: parent.width - (root.practiced ? checkMark.width + Style.space(12) : 0)
+                  text: root.step ? root.step.title : ""
+                  color: root.foreground
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
+                  font.pixelSize: Style.font.displayLarge
                   font.bold: true
+                  wrapMode: Text.WordWrap
+                  horizontalAlignment: root.titleCard ? Text.AlignHCenter : Text.AlignLeft
+                }
+
+                Rectangle {
+                  id: checkMark
+                  anchors.right: parent.right
+                  anchors.verticalCenter: titleText.verticalCenter
+                  width: Style.space(28)
+                  height: Style.space(28)
+                  radius: width / 2
+                  color: Color.accent
+                  visible: root.practiced && !root.titleCard
+                  opacity: visible ? 1 : 0
+                  Behavior on opacity { NumberAnimation { duration: 160 } }
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: "✓"
+                    color: root.background
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                  }
+                }
+              }
+
+              Item {
+                visible: root.titleCard
+                width: parent.width
+                height: Style.space(4)
+
+                Rectangle {
+                  width: Style.space(56)
+                  height: parent.height
+                  radius: height / 2
+                  color: Color.accent
+                  anchors.horizontalCenter: parent.horizontalCenter
                 }
               }
             }
@@ -1393,110 +1455,255 @@ Item {
             LessonDiagram {
               width: parent.width
               kind: root.diagramKind
-              visible: !root.overviewing
+              visible: !root.overviewing && !root.titleCard
             }
 
             Text {
               width: parent.width
-              visible: !root.overviewing
+              visible: !root.overviewing || (root.step && root.step.id === "done")
               text: root.step ? root.step.body : ""
               color: Color.muted
               font.family: root.fontFamily
-              font.pixelSize: Style.font.title
+              font.pixelSize: root.titleCard ? Style.font.heading : Style.font.title
               wrapMode: Text.WordWrap
               lineHeight: 1.35
+              horizontalAlignment: root.titleCard ? Text.AlignHCenter : Text.AlignLeft
             }
 
-            Flickable {
-              id: recapFlick
+            Item {
               visible: root.overviewing
               width: parent.width
-              height: visible ? Math.min(recapColumn.implicitHeight, Style.space(320)) : 0
-              contentWidth: width
-              contentHeight: recapColumn.implicitHeight
-              clip: true
-              boundsBehavior: Flickable.StopAtBounds
-              flickableDirection: Flickable.VerticalFlick
+              height: recapFlick.height
 
-              Column {
-                id: recapColumn
-                width: recapFlick.width
-                spacing: Style.space(12)
+              Flickable {
+                id: recapFlick
+                width: parent.width
+                height: visible ? Math.min(recapColumn.implicitHeight, Style.space(360)) : 0
+                contentWidth: width
+                contentHeight: recapColumn.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                visible: root.overviewing
 
-                Repeater {
-                  model: root.overviewing ? root.overviewItems.length : 0
-                  delegate: Item {
-                    required property int index
-                    readonly property var recap: root.overviewItems[index] || ({ title: "", keys: "" })
-                    width: recapColumn.width
-                    height: recapTitle.implicitHeight
+                Column {
+                  id: recapColumn
+                  width: recapFlick.width
+                  spacing: Style.space(16)
 
-                    Text {
-                      id: recapTitle
-                      width: parent.width - recapKeys.implicitWidth - Style.space(16)
-                      text: recap.title
-                      color: root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      wrapMode: Text.WordWrap
-                    }
+                  Repeater {
+                    model: root.overviewing ? root.overviewGroups.length : 0
+                    delegate: Column {
+                      id: groupCol
+                      required property int index
+                      readonly property var group: root.overviewGroups[index] || ({ label: "", items: [] })
+                      width: recapColumn.width
+                      spacing: Style.space(8)
 
-                    Text {
-                      id: recapKeys
-                      anchors.right: parent.right
-                      anchors.verticalCenter: recapTitle.verticalCenter
-                      text: recap.keys
-                      color: Color.muted
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.bodySmall
+                      Text {
+                        width: parent.width
+                        text: groupCol.group.label
+                        color: Color.muted
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.bodySmall
+                        font.bold: true
+                      }
+
+                      Flow {
+                        width: parent.width
+                        spacing: Style.space(8)
+
+                        Repeater {
+                          model: groupCol.group.items ? groupCol.group.items.length : 0
+                          delegate: Rectangle {
+                            id: pill
+                            required property int index
+                            readonly property var item: groupCol.group.items[index] || ({ title: "", keys: "", index: -1 })
+                            width: Math.min(recapColumn.width, pillLabel.implicitWidth + Style.space(22))
+                            height: Style.space(36)
+                            radius: height / 2
+                            color: Util.alpha(Color.accent, 0.16)
+
+                            Text {
+                              id: pillLabel
+                              anchors.centerIn: parent
+                              text: pill.item.title
+                              color: root.foreground
+                              font.family: root.fontFamily
+                              font.pixelSize: Style.font.bodySmall
+                              font.bold: true
+                            }
+
+                            MouseArea {
+                              anchors.fill: parent
+                              hoverEnabled: true
+                              cursorShape: Qt.PointingHandCursor
+                              onClicked: root.jumpToLesson(pill.item.index)
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
               }
+
+              Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Style.space(56)
+                visible: recapFlick.contentHeight > recapFlick.height + 8 && !recapFlick.atYEnd
+                gradient: Gradient {
+                  GradientStop { position: 0.0; color: "transparent" }
+                  GradientStop { position: 1.0; color: root.titleCard ? Util.alpha(Color.accent, 0.12) : root.background }
+                }
+              }
+
+              Column {
+                id: recapScrollHint
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottomMargin: Style.space(4)
+                spacing: Style.space(2)
+                visible: recapFlick.contentHeight > recapFlick.height + 8 && !recapFlick.atYEnd
+
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  text: "↓"
+                  color: Color.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.heading
+                  font.bold: true
+                  transform: Translate { id: recapScrollNudge }
+
+                  SequentialAnimation {
+                    running: recapScrollHint.visible
+                    loops: Animation.Infinite
+                    NumberAnimation { target: recapScrollNudge; property: "y"; to: 5; duration: 700; easing.type: Easing.InOutSine }
+                    NumberAnimation { target: recapScrollNudge; property: "y"; to: 0; duration: 700; easing.type: Easing.InOutSine }
+                  }
+                }
+
+                Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  text: "scroll"
+                  color: Color.muted
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: true
+                }
+              }
             }
 
-            Row {
-              visible: root.showKeycaps && !root.overviewing
-              spacing: Style.space(8)
-              Repeater {
-                model: root.keycaps
-                delegate: Item {
-                  id: keyWrap
-                  required property string modelData
-                  required property int index
-                  readonly property bool struck: root.keyBeat === keyWrap.index
-                  width: keyFace.width
-                  height: keyFace.height + Style.space(4)
+            Column {
+              visible: (root.showKeycaps || root.practiceCaps.length) && !root.overviewing
+              spacing: Style.space(10)
 
-                  Rectangle {
+              Row {
+                visible: root.showKeycaps
+                spacing: Style.space(8)
+                Repeater {
+                  model: root.keycaps
+                  delegate: Item {
+                    id: keyWrap
+                    required property string modelData
+                    required property int index
+                    readonly property bool struck: root.keyBeat === keyWrap.index
+                    width: keyFace.width
+                    height: keyFace.height + Style.space(4)
+
+                    Rectangle {
+                      anchors.left: parent.left
+                      anchors.right: parent.right
+                      anchors.bottom: parent.bottom
+                      height: keyFace.height - Style.space(2)
+                      radius: Math.min(root.cornerRadius, Style.space(10))
+                      color: Qt.rgba(0, 0, 0, 0.28)
+                    }
+
+                    Rectangle {
+                      id: keyFace
+                      y: keyWrap.struck ? Style.space(3) : 0
+                      width: Math.max(Style.space(44), keyLabel.implicitWidth + Style.space(22))
+                      height: Style.space(42)
+                      radius: Math.min(root.cornerRadius, Style.space(10))
+                      color: keyWrap.struck ? Color.accent : Util.alpha(root.foreground, 0.08)
+
+                      Behavior on y { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
+                      Behavior on color { ColorAnimation { duration: 90 } }
+
+                      Text {
+                        id: keyLabel
+                        anchors.centerIn: parent
+                        text: keyWrap.modelData
+                        color: keyWrap.struck ? root.background : root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                        font.bold: true
+                      }
+                    }
+                  }
+                }
+              }
+
+              Text {
+                visible: root.practiceCaps.length > 0
+                text: "Try these again"
+                color: Color.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.bold: true
+              }
+
+              Repeater {
+                model: root.practiceCaps.length
+                delegate: Item {
+                  id: practiceRow
+                  required property int index
+                  readonly property var row: {
+                    var item = root.practiceCaps[index]
+                    if (!item) return { caps: [], does: "" }
+                    if (item.caps) return item
+                    return { caps: item, does: "" }
+                  }
+                  width: parent.width
+                  height: Math.max(practiceKeys.height, practiceDoes.implicitHeight)
+
+                  Row {
+                    id: practiceKeys
                     anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    height: keyFace.height - Style.space(2)
-                    radius: Math.min(root.cornerRadius, Style.space(10))
-                    color: Qt.rgba(0, 0, 0, 0.28)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Repeater {
+                      model: practiceRow.row.caps || []
+                      delegate: Rectangle {
+                        required property string modelData
+                        width: Math.max(Style.space(36), practiceCapLabel.implicitWidth + Style.space(16))
+                        height: Style.space(32)
+                        radius: Math.min(root.cornerRadius, Style.space(8))
+                        color: Util.alpha(root.foreground, 0.08)
+
+                        Text {
+                          id: practiceCapLabel
+                          anchors.centerIn: parent
+                          text: parent.modelData
+                          color: root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.bodySmall
+                          font.bold: true
+                        }
+                      }
+                    }
                   }
 
                   Rectangle {
-                    id: keyFace
-                    y: keyWrap.struck ? Style.space(3) : 0
-                    width: Math.max(Style.space(44), keyLabel.implicitWidth + Style.space(22))
-                    height: Style.space(42)
-                    radius: Math.min(root.cornerRadius, Style.space(10))
-                    color: keyWrap.struck ? Color.accent : Util.alpha(root.foreground, 0.08)
-
-                    Behavior on y { NumberAnimation { duration: 90; easing.type: Easing.OutCubic } }
-                    Behavior on color { ColorAnimation { duration: 90 } }
-
-                    Text {
-                      id: keyLabel
-                      anchors.centerIn: parent
-                      text: keyWrap.modelData
-                      color: keyWrap.struck ? root.background : root.foreground
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      font.bold: true
-                    }
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 1
+                    color: Util.alpha(root.foreground, 0.08)
+                    visible: practiceRow.index < root.practiceCaps.length - 1
                   }
                 }
               }
@@ -1629,7 +1836,7 @@ Item {
           width: parent.width
           visible: root.showHints
           text: root.overviewing
-            ? "↑  ↓  or  Page Up/Down  to scroll     Enter  to finish     Esc  to close"
+            ? "Click a card to go back     ↑  ↓  to scroll     Enter  to finish     Esc  to close"
             : (TourModel.enterAction(root.step) === "overview"
               ? "Enter  to see the shortcuts     Esc  to close"
               : (TourModel.enterAction(root.step) === "finish"
