@@ -13,8 +13,7 @@ does not work out of the box.
 Requires [Omarchy Quattro](https://omarchy.org/). No extra packages. No sudo.
 
 The plugin does not edit Hyprland, `shell.json`, or `omarchy-menu.jsonc`. It
-only writes `~/.local/state/omarchy/tour.json` and, if keyboard lighting is
-active, a temporary restore snapshot next to it.
+only writes `~/.local/state/omarchy/tour.json`.
 
 ## Install
 
@@ -48,13 +47,13 @@ desktop again.
 | --- | --- |
 | ← → or the arrow buttons | Previous / next lesson |
 | The keys on the card | Try the feature |
-| Enter | Show me / continue / finish |
+| Enter | Show me / continue / recap / finish |
 | Escape | Close |
 
 | Length | What you get |
 | --- | --- |
 | Short | Menu, tiling, workspaces, files, agent |
-| Standard | Plus move, snap, apps, two monitors, bar, clipboard |
+| Standard | Plus move, snap, terminal, browser, two monitors, bar, clipboard |
 | Extensive | Plus resize, pop-out, every shortcut, themes |
 
 ```sh
@@ -83,24 +82,15 @@ rm -f ~/.local/state/omarchy/tour.json ~/.local/state/omarchy/tour-lights.json
 
 Listing metadata for [omarchyplugins.com](https://omarchyplugins.com/):
 
-- Plugin ID: `io.github.julio.tour`
 - Category: `Desktop`
 - Tags: `tour`, `onboarding`, `bar`, `hyprland`
 - License: MIT (see `LICENSE`)
 - Repository: `https://github.com/herr-brandt/omarchy-tour`
 
-Do not submit the marketplace issue until the GitHub repository is public.
 Filled-in form answers live in [`docs/marketplace.md`](docs/marketplace.md).
 
 Community plugins run unsandboxed. Marketplace listing is not a security
 audit. Review this repository before you enable it.
-
-## Keyboard lights
-
-If [OpenRGB](https://openrgb.org/) is running with its SDK server (port 6742),
-the tour lights the current shortcut and restores colors when the overlay
-pauses or closes. Optional. Cooler Master MasterKeys Pro M Single (white LEDs)
-has firmware-only lighting, so the helper no-ops there.
 
 ## Develop
 

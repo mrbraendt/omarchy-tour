@@ -8,7 +8,7 @@ Fill the [submit-plugin](https://github.com/HANCORE-linux/omarchy-plugin-marketp
 - [x] README and MIT license
 - [x] Safe install: `omarchy plugin add <url> --enable`
 - [x] Safe removal: `omarchy plugin remove io.github.julio.tour`
-- [ ] Public GitHub repository
+- [x] Public GitHub repository
 - [ ] Optional preview image (1200×630 or similar; marketplace optimizes it)
 
 ## Form answers

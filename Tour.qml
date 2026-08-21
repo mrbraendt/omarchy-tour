@@ -24,6 +24,7 @@ Item {
   property int highlightedLength: 1
   property bool practiced: false
   property bool spawnedDemos: false
+  property bool overviewing: false
   property bool slideEnabled: true
   property bool hasAgent: true
   property bool isLaptop: true
@@ -39,7 +40,8 @@ Item {
   readonly property bool canGoForward: !root.choosing && root.stepIndex < Math.max(0, root.stepTotal - 1)
   readonly property bool onLast: !root.choosing && TourModel.isLast(root.lengthId, root.stepIndex, root.trackOpts())
   readonly property string diagramKind: (!root.choosing && root.step && root.step.diagram) ? String(root.step.diagram) : "none"
-  readonly property bool showHints: root.choosing || root.stepIndex === 0
+  readonly property bool showHints: root.choosing || root.stepIndex === 0 || root.onLast
+  readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.trackOpts())
 
   property color background: Color.menu.background
   property color foreground: Color.menu.text
@@ -178,6 +180,7 @@ Item {
     practiceTimer.stop()
     keyBeat = 0
     root.practiced = false
+    root.overviewing = false
     root.skipSnapshot = null
     root.markSeen()
     if (payload.length) {
@@ -200,6 +203,7 @@ Item {
     practiceTimer.stop()
     root.paused = false
     root.practiced = false
+    root.overviewing = false
     root.opened = false
     root.cleanupDemos()
     root.runLights(["restore"])
@@ -210,6 +214,7 @@ Item {
     practiceTimer.stop()
     root.paused = false
     root.practiced = false
+    root.overviewing = false
     root.opened = false
     root.cleanupDemos()
     root.runLights(["restore"])
@@ -244,6 +249,7 @@ Item {
     resumeTimer.stop()
     practiceTimer.stop()
     root.practiced = false
+    root.overviewing = false
     root.stepIndex = index
     root.step = next
     root.keycaps = caps
@@ -280,13 +286,17 @@ Item {
 
   function goBack() {
     if (root.choosing || root.stepIndex <= 0) return
+    if (root.overviewing) {
+      root.overviewing = false
+      return
+    }
     root.applyStep(TourModel.prevIndex(root.lengthId, root.stepIndex, root.trackOpts()))
   }
 
   function goForward() {
     if (root.choosing) return
     if (root.onLast) {
-      root.finish()
+      root.onLastEnter()
       return
     }
     root.applyStep(TourModel.nextIndex(root.lengthId, root.stepIndex, root.trackOpts()))
@@ -315,13 +325,21 @@ Item {
     practiceTimer.restart()
   }
 
+  function onLastEnter() {
+    if (TourModel.enterAction(root.step) === "overview" && !root.overviewing) {
+      root.overviewing = true
+      return
+    }
+    root.finish()
+  }
+
   function onEnter() {
     if (root.choosing) {
       root.startLength(root.highlightedLength === 0 ? "short" : (root.highlightedLength === 2 ? "extensive" : "standard"))
       return
     }
     var action = TourModel.enterAction(root.step)
-    if (action === "finish") root.finish()
+    if (action === "finish" || action === "overview") root.onLastEnter()
     else if (action === "demo") root.runDemo(root.step)
     else root.goForward()
   }
@@ -931,10 +949,12 @@ Item {
             LessonDiagram {
               width: parent.width
               kind: root.diagramKind
+              visible: !root.overviewing
             }
 
             Text {
               width: parent.width
+              visible: !root.overviewing
               text: root.step ? root.step.body : ""
               color: Color.muted
               font.family: root.fontFamily
@@ -943,8 +963,56 @@ Item {
               lineHeight: 1.35
             }
 
+            Flickable {
+              id: recapFlick
+              visible: root.overviewing
+              width: parent.width
+              height: visible ? Math.min(recapColumn.implicitHeight, Style.space(320)) : 0
+              contentWidth: width
+              contentHeight: recapColumn.implicitHeight
+              clip: true
+              boundsBehavior: Flickable.StopAtBounds
+              flickableDirection: Flickable.VerticalFlick
+
+              Column {
+                id: recapColumn
+                width: recapFlick.width
+                spacing: Style.space(12)
+
+                Repeater {
+                  model: root.overviewing ? root.overviewItems.length : 0
+                  delegate: Item {
+                    required property int index
+                    readonly property var recap: root.overviewItems[index] || ({ title: "", keys: "" })
+                    width: recapColumn.width
+                    height: recapTitle.implicitHeight
+
+                    Text {
+                      id: recapTitle
+                      width: parent.width - recapKeys.implicitWidth - Style.space(16)
+                      text: recap.title
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                      id: recapKeys
+                      anchors.right: parent.right
+                      anchors.verticalCenter: recapTitle.verticalCenter
+                      text: recap.keys
+                      color: Color.muted
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+                  }
+                }
+              }
+            }
+
             Row {
-              visible: root.showKeycaps
+              visible: root.showKeycaps && !root.overviewing
               spacing: Style.space(8)
               Repeater {
                 model: root.keycaps
@@ -1076,11 +1144,15 @@ Item {
           visible: root.showHints
           text: root.choosing
             ? "1  2  3  to choose     Enter  to begin     Esc  to close"
-            : (TourModel.enterAction(root.step) === "finish"
+            : (root.overviewing
+              ? "Enter  to finish     Esc  to close"
+              : (TourModel.enterAction(root.step) === "overview"
+                ? "Enter  to see the shortcuts     Esc  to close"
+                : (TourModel.enterAction(root.step) === "finish"
               ? "Enter  to finish     Esc  to close"
               : (root.step && root.step.keys && root.step.keys.length
                 ? "←  →  lessons     Enter  to show me     Esc  to close"
-                : "←  →  lessons     Enter  to continue     Esc  to close"))
+                : "←  →  lessons     Enter  to continue     Esc  to close"))))
           color: Color.muted
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall

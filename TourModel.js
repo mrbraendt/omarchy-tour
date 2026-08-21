@@ -137,19 +137,28 @@ function allSteps() {
       tracks: ["standard", "extensive"]
     },
     {
-      id: "apps-open",
-      title: "Terminal and browser",
-      body: "Super + Return is a terminal. Super + Shift + Return is the browser.",
-      emptyBody: "Super + Return is a terminal. Super + Shift + Return is the browser. A second window splits the screen with the first.",
-      keys: [
-        { key: "Enter", meta: true, alt: false, ctrl: false, shift: false },
-        { key: "Enter", meta: true, alt: false, ctrl: false, shift: true }
-      ],
+      id: "terminal",
+      title: "The terminal",
+      body: "Super + Return opens a terminal.",
+      keys: [{ key: "Enter", meta: true, alt: false, ctrl: false, shift: false }],
       keycaps: ["Super", "Return"],
       spotlight: "none",
       diagram: "none",
       enter: "demo",
       demo: { command: ["omarchy-launch-terminal"] },
+      resumeMs: 2500,
+      tracks: ["standard", "extensive"]
+    },
+    {
+      id: "browser",
+      title: "The browser",
+      body: "Super + Shift + Return opens the browser. It tiles next to whatever is already open.",
+      keys: [{ key: "Enter", meta: true, alt: false, ctrl: false, shift: true }],
+      keycaps: ["Super", "Shift", "Return"],
+      spotlight: "none",
+      diagram: "none",
+      enter: "demo",
+      demo: { command: ["omarchy-launch-browser"] },
       resumeMs: 2500,
       tracks: ["standard", "extensive"]
     },
@@ -195,7 +204,7 @@ function allSteps() {
     {
       id: "agent",
       title: "Ask the agent",
-      body: "If a monitor, printer, or Wi-Fi does not work, ask the agent. Super + Shift + Ctrl + A opens it. Choose which agent in the menu: Setup → Defaults → Agent.",
+      body: "If a monitor, printer, or speaker does not work, ask the agent. Super + Shift + Ctrl + A opens it. Choose which agent in the menu: Setup → Defaults → Agent.",
       keys: [{ key: "A", meta: true, alt: false, ctrl: true, shift: true }],
       keycaps: ["Super", "Shift", "Ctrl", "A"],
       spotlight: "none",
@@ -237,13 +246,13 @@ function allSteps() {
     },
     {
       id: "done",
-      title: "That's the shape of it",
-      body: "Learn in the menu has the full manual. Click Tour on the bar to run this again.",
+      title: "That was the Omarchy tour",
+      body: "Learn in the menu has the full manual. Click Tour on the bar to run this again. Press Enter once for a recap of the shortcuts from this tour.",
       keys: [],
       keycaps: [],
       spotlight: "none",
       diagram: "none",
-      enter: "finish",
+      enter: "overview",
       demo: null,
       resumeMs: 0,
       tracks: ["short", "standard", "extensive"]
@@ -343,8 +352,8 @@ function lengthMeta(opts) {
     ? "Menu, tiling, workspaces, files, and the agent"
     : "Menu, tiling, workspaces, and files"
   var standardDetail = monitorCountFrom(opts) >= 2
-    ? "Plus move, snap, apps, two monitors, and the bar"
-    : "Plus move, snap, apps, and the bar"
+    ? "Plus move, snap, terminal, browser, two monitors, and the bar"
+    : "Plus move, snap, terminal, browser, and the bar"
   return [
     {
       id: "short",
@@ -485,6 +494,20 @@ function canPractice(step) {
 function enterAction(step) {
   if (!step || !step.enter) return "continue"
   return step.enter
+}
+
+function overviewItems(length, opts) {
+  var list = stepsFor(length, opts)
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var step = list[i]
+    if (!step || step.id === "done") continue
+    if (!step.keycaps || !step.keycaps.length) continue
+    var keys = []
+    for (var k = 0; k < step.keycaps.length; k++) keys.push(step.keycaps[k])
+    out.push({ title: step.title, keys: keys.join(" + ") })
+  }
+  return out
 }
 
 function hasKeycaps(step) {
