@@ -1,6 +1,6 @@
-# Marketplace listing (not submitted)
+# Marketplace listing
 
-Fill the [submit-plugin](https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/new?template=submit-plugin.yml) form **after** `https://github.com/herr-brandt/omarchy-tour` is public. Do not open the issue until then.
+Submitted: https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/1326
 
 ## Prepare the repository
 
@@ -34,4 +34,4 @@ gh auth login
 gh repo create herr-brandt/omarchy-tour --public --source=. --remote=origin --push
 ```
 
-Then open the marketplace issue with the table above. Do not submit until Julio says so.
+Submitted with category Desktop and tags `bar`, `hyprland`, `quickshell`. Suggested extra tag: `onboarding`.
