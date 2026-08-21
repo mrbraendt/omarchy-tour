@@ -9,7 +9,7 @@ Submitted: https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/13
 - [x] Safe install: `omarchy plugin add <url> --enable`
 - [x] Safe removal: `omarchy plugin remove io.github.julio.tour`
 - [x] Public GitHub repository
-- [ ] Optional preview image (1200×630 or similar; marketplace optimizes it)
+- [x] Optional preview image (1200×630 or similar; marketplace optimizes it)
 
 ## Form answers
 
