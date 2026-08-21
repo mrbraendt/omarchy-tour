@@ -7,7 +7,7 @@ Submitted: https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/13
 - [x] `manifest.json` in the repository root (`omarchy plugin validate .`)
 - [x] README and MIT license
 - [x] Safe install: `omarchy plugin add <url> --enable`
-- [x] Safe removal: `omarchy plugin remove io.github.julio.tour`
+- [x] Safe removal: `omarchy plugin remove io.github.herr-brandt.tour`
 - [x] Public GitHub repository
 - [x] Optional preview image (1200×630 or similar; marketplace optimizes it)
 
@@ -16,12 +16,12 @@ Submitted: https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/13
 | Field | Value |
 | --- | --- |
 | Plugin repository | `https://github.com/herr-brandt/omarchy-tour` |
-| Plugin ID | `io.github.julio.tour` |
+| Plugin ID | `io.github.herr-brandt.tour` |
 | Name | Tour |
 | Category | Desktop |
 | Tags | `tour`, `onboarding`, `bar`, `hyprland` |
 | Short description | Interactive desktop tour for Omarchy. The bar chip starts it; lessons wait for the shortcut, or Enter shows you. |
-| Author | Julio |
+| Author | herr-brandt |
 
 ## Publish locally, then GitHub
 

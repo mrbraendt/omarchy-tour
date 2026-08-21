@@ -25,7 +25,7 @@ The bar chip is highlighted until you finish the tour or right-click it. It
 does not open by itself.
 
 ```sh
-omarchy-shell shell summon io.github.julio.tour '{}'
+omarchy-shell shell summon io.github.herr-brandt.tour '{}'
 ```
 
 From a local checkout:
@@ -59,7 +59,7 @@ use Super + W while those lessons are on screen.
 | Extensive | Plus resize, pop-out, every shortcut |
 
 ```sh
-omarchy-shell shell toggle io.github.julio.tour '{}'
+omarchy-shell shell toggle io.github.herr-brandt.tour '{}'
 ```
 
 Optional: add it under Learn in Super+Space yourself. Tour never writes
@@ -69,14 +69,14 @@ Optional: add it under Learn in Super+Space yourself. Tour never writes
 "learn.tour": {
   "icon": "󰗲",
   "label": "Desktop tour",
-  "action": "omarchy-shell shell summon io.github.julio.tour '{}'"
+  "action": "omarchy-shell shell summon io.github.herr-brandt.tour '{}'"
 }
 ```
 
 ## Remove
 
 ```sh
-omarchy plugin remove io.github.julio.tour
+omarchy plugin remove io.github.herr-brandt.tour
 rm -f ~/.local/state/omarchy/tour.json ~/.local/state/omarchy/tour-lights.json
 ```
 

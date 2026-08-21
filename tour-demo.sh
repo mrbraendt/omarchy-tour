@@ -5,7 +5,7 @@ set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 WIN="$DIR/tour-demo-window.sh"
-CLASS="io.github.julio.tour.demo"
+CLASS="io.github.herr-brandt.tour.demo"
 
 spawn_one() {
   local n="$1"

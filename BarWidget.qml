@@ -7,14 +7,14 @@ import "TourModel.js" as TourModel
 
 BarWidget {
   id: root
-  moduleName: "io.github.julio.tour"
+  moduleName: "io.github.herr-brandt.tour"
 
   readonly property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/tour.json"
   property bool nudge: true
 
   function summonTour() {
     root.markSeen()
-    Quickshell.execDetached(["omarchy-shell", "shell", "toggle", "io.github.julio.tour", "{}"])
+    Quickshell.execDetached(["omarchy-shell", "shell", "toggle", "io.github.herr-brandt.tour", "{}"])
   }
 
   function markSeen() {

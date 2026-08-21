@@ -32,7 +32,7 @@ Item {
   property bool isLaptop: true
   property var skipSnapshot: null
 
-  readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.julio.tour"
+  readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.herr-brandt.tour"
   readonly property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/tour.json"
   property int monitorCount: 2
   property int clientCount: 2
@@ -74,6 +74,13 @@ Item {
 
   readonly property bool panelVisible: root.opened
   readonly property bool titleCard: !root.choosing && !!(root.step && root.step.kind === "title")
+  readonly property color titleFill: Qt.rgba(
+    root.background.r * 0.86 + Color.accent.r * 0.14,
+    root.background.g * 0.86 + Color.accent.g * 0.14,
+    root.background.b * 0.86 + Color.accent.b * 0.14,
+    1
+  )
+  readonly property var titleBorderSpec: Border.surfaceSpec("menu", "border", Color.accent, Math.max(2, Style.space(2)))
   readonly property bool showKeycaps: !root.choosing && !root.titleCard && root.nonempty(root.keycaps)
   readonly property var practiceCaps: (root.step && root.step.practiceCaps) ? root.step.practiceCaps : []
 
@@ -325,7 +332,7 @@ Item {
         var rect = root.clientLocalRect(client)
         var cls = String(client.class || "")
         var addr = client.address ? String(client.address) : ""
-        if (cls === "io.github.julio.tour.demo" && rect) demos.push(rect)
+        if (cls === "io.github.herr-brandt.tour.demo" && rect) demos.push(rect)
         if (rect && addr && !root.addressKnown(addr)) fresh.push(rect)
         if (rect && cls) {
           if (!byClass[cls]) byClass[cls] = []
@@ -1290,9 +1297,9 @@ Item {
       width: Math.min(root.titleCard ? Style.space(560) : Style.space(620), parent.width - Style.space(56))
       height: inner.implicitHeight + root.cardPad * 2
       radius: root.cornerRadius
-      color: root.titleCard ? Util.alpha(Color.accent, 0.12) : root.background
+      color: root.titleCard ? root.titleFill : root.background
       clip: true
-      borderSpec: root.borderSpec
+      borderSpec: root.titleCard ? root.titleBorderSpec : root.borderSpec
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
       anchors.bottomMargin: Style.space(48)
@@ -1556,7 +1563,7 @@ Item {
                 visible: recapFlick.contentHeight > recapFlick.height + 8 && !recapFlick.atYEnd
                 gradient: Gradient {
                   GradientStop { position: 0.0; color: "transparent" }
-                  GradientStop { position: 1.0; color: root.titleCard ? Util.alpha(Color.accent, 0.12) : root.background }
+                  GradientStop { position: 1.0; color: root.titleCard ? root.titleFill : root.background }
                 }
               }
 

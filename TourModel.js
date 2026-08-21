@@ -357,7 +357,7 @@ function allSteps() {
       section: "done",
       keys: [],
       keycaps: [],
-      spotlight: "chip:io.github.julio.tour",
+      spotlight: "chip:io.github.herr-brandt.tour",
       diagram: "none",
       enter: "finish",
       demo: null,
