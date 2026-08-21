@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.julio.tour",
+  "name": "Tour",
+  "version": "1.4.0",
+  "author": "Julio",
+  "license": "MIT",
+  "description": "Interactive desktop tour for Omarchy. The bar chip starts it; lessons wait for the shortcut, or Enter shows you.",
+  "kinds": ["overlay", "bar-widget", "service"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Tour.qml",
+    "barWidget": "BarWidget.qml",
+    "service": "Service.qml"
+  },
+  "barWidget": {
+    "displayName": "Tour",
+    "category": "Desktop",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

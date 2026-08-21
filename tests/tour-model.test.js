@@ -1,0 +1,170 @@
+const fs = require("fs")
+const path = require("path")
+const vm = require("vm")
+const assert = require("assert")
+
+const source = fs.readFileSync(path.join(__dirname, "..", "TourModel.js"), "utf8")
+const sandbox = {}
+vm.createContext(sandbox)
+vm.runInContext(source, sandbox)
+
+const {
+  allSteps, stepsFor, stepAt, lastIndex, progressLabel, matches, nextIndex, isLast,
+  prevIndex, parseState, serializeState, enterAction, normalizeLength, lengthFromKey,
+  lengthMeta, lengthLabel, chipNudge, canPractice, knownDiagrams, demoCommand
+} = sandbox
+
+assert.strictEqual(sandbox.lengthIds().join(","), "short,standard,extensive")
+assert.strictEqual(normalizeLength("nope"), "standard")
+assert.strictEqual(lengthFromKey("1"), "short")
+assert.strictEqual(lengthFromKey("2"), "standard")
+assert.strictEqual(lengthFromKey("3"), "extensive")
+
+const shortIds = stepsFor("short").map(s => s.id)
+const standardIds = stepsFor("standard").map(s => s.id)
+const extensiveIds = stepsFor("extensive").map(s => s.id)
+const singleMonitor = stepsFor("standard", { monitors: 1 }).map(s => s.id)
+
+assert.strictEqual(shortIds.join(","), "menu,tiling,workspaces,files,agent,done")
+assert.ok(standardIds.indexOf("apps-open") !== -1)
+assert.ok(standardIds.indexOf("move") !== -1)
+assert.ok(standardIds.indexOf("snap") !== -1)
+assert.ok(standardIds.indexOf("monitors") !== -1)
+assert.ok(standardIds.indexOf("bar") !== -1)
+assert.ok(standardIds.indexOf("clipboard") !== -1)
+assert.ok(singleMonitor.indexOf("monitors") === -1)
+assert.ok(extensiveIds.indexOf("float") !== -1)
+assert.ok(extensiveIds.indexOf("resize") !== -1)
+assert.ok(extensiveIds.indexOf("keybindings") !== -1)
+assert.ok(extensiveIds.indexOf("theme") !== -1)
+assert.ok(extensiveIds.indexOf("emoji") === -1)
+assert.ok(extensiveIds.indexOf("screenshot") === -1)
+assert.ok(extensiveIds.indexOf("apps") === -1)
+assert.strictEqual(extensiveIds[extensiveIds.length - 1], "done")
+assert.strictEqual(allSteps().length, extensiveIds.length)
+assert.ok(shortIds.indexOf("tiling") < shortIds.indexOf("workspaces"))
+assert.ok(shortIds.indexOf("workspaces") < shortIds.indexOf("files"))
+assert.ok(shortIds.indexOf("files") < shortIds.indexOf("agent"))
+assert.ok(standardIds.indexOf("tiling") < standardIds.indexOf("move"))
+assert.ok(standardIds.indexOf("move") < standardIds.indexOf("snap"))
+assert.ok(standardIds.indexOf("snap") < standardIds.indexOf("workspaces"))
+assert.ok(standardIds.indexOf("workspaces") < standardIds.indexOf("monitors"))
+assert.ok(extensiveIds.indexOf("snap") < extensiveIds.indexOf("resize"))
+assert.ok(extensiveIds.indexOf("resize") < extensiveIds.indexOf("float"))
+assert.ok(extensiveIds.indexOf("float") < extensiveIds.indexOf("workspaces"))
+
+assert.strictEqual(stepAt("standard", 0).id, "menu")
+assert.strictEqual(stepAt("short", lastIndex("short")).id, "done")
+assert.strictEqual(progressLabel(0, 5), "1 of 5")
+assert.strictEqual(nextIndex("short", 0), 1)
+assert.strictEqual(nextIndex("short", lastIndex("short")), lastIndex("short"))
+assert.strictEqual(prevIndex("short", 0), 0)
+assert.strictEqual(prevIndex("short", 2), 1)
+assert.strictEqual(isLast("short", lastIndex("short")), true)
+assert.strictEqual(enterAction(stepAt("short", 0)), "demo")
+assert.strictEqual(enterAction(stepAt("short", 1)), "demo")
+assert.strictEqual(enterAction(stepAt("short", lastIndex("short"))), "finish")
+assert.strictEqual(lengthLabel("short"), "Short Tour")
+assert.strictEqual(lengthMeta()[0].label, "Short Tour")
+assert.strictEqual(lengthMeta()[1].label, "Standard Tour")
+assert.strictEqual(lengthMeta()[2].label, "Extensive Tour")
+
+const menu = stepAt("standard", 0)
+assert.ok(matches(menu, { key: "Space", meta: true, alt: false, ctrl: false, shift: false }))
+assert.ok(!matches(menu, { key: "Space", meta: true, alt: true, ctrl: false, shift: false }))
+assert.ok(!matches(stepAt("short", 1), { key: "Space", meta: true, alt: false, ctrl: false, shift: false }))
+
+const tiling = stepsFor("short").find(s => s.id === "tiling")
+assert.ok(matches(tiling, { key: "T", meta: true, alt: false, ctrl: false, shift: false }))
+assert.strictEqual(enterAction(tiling), "demo")
+
+const emptyTiling = stepsFor("short", { clients: 0 }).find(s => s.id === "tiling")
+assert.strictEqual(enterAction(emptyTiling), "demo")
+assert.ok(emptyTiling.demo && emptyTiling.demo.command[0] === "tour-demo")
+assert.ok(emptyTiling.body.indexOf("demo windows") !== -1)
+assert.strictEqual(emptyTiling.diagram, "tiling")
+assert.ok(canPractice(emptyTiling))
+assert.strictEqual(demoCommand(emptyTiling, { key: "T", meta: true, alt: false, ctrl: false, shift: false }).join(" "), "tour-demo act float")
+
+const emptySnap = stepsFor("standard", { clients: 1 }).find(s => s.id === "snap")
+assert.strictEqual(enterAction(emptySnap), "demo")
+assert.strictEqual(demoCommand(emptySnap, { key: "Left", meta: true, alt: false, ctrl: false, shift: false }).join(" "), "tour-demo act focus l")
+assert.strictEqual(demoCommand(emptySnap, { key: "Left", meta: true, alt: false, ctrl: false, shift: true }).join(" "), "tour-demo act swap l")
+
+const files = stepsFor("short").find(s => s.id === "files")
+assert.ok(matches(files, { key: "F", meta: true, alt: false, ctrl: false, shift: true }))
+
+const agent = stepsFor("short").find(s => s.id === "agent")
+assert.ok(agent.body.indexOf("agent") !== -1)
+assert.ok(agent.body.indexOf("Super + Return") === -1)
+assert.strictEqual(enterAction(agent), "demo")
+assert.ok(matches(agent, { key: "A", meta: true, alt: false, ctrl: true, shift: true }))
+assert.ok(!matches(agent, { key: "A", meta: true, alt: false, ctrl: false, shift: false }))
+
+const clip = stepsFor("standard").find(s => s.id === "clipboard")
+assert.ok(matches(clip, { key: "V", meta: true, alt: false, ctrl: true, shift: false }))
+
+const work = stepsFor("standard").find(s => s.id === "workspaces")
+assert.ok(matches(work, { key: "Tab", meta: true, alt: false, ctrl: false, shift: false }))
+assert.ok(work.demo.command.indexOf("hl.dsp.focus({ workspace = \"e+1\" })") !== -1)
+
+const snap = stepsFor("standard").find(s => s.id === "snap")
+assert.ok(matches(snap, { key: "Left", meta: true, alt: false, ctrl: false, shift: false }))
+assert.ok(matches(snap, { key: "Right", meta: true, alt: false, ctrl: false, shift: true }))
+assert.ok(String(snap.demo.command.join(" ")).indexOf("swap") !== -1)
+
+const pop = stepsFor("extensive").find(s => s.id === "float")
+assert.ok(matches(pop, { key: "O", meta: true, alt: false, ctrl: false, shift: false }))
+assert.strictEqual(demoCommand(pop, { key: "O", meta: true, alt: false, ctrl: false, shift: false }).join(" "), "tour-demo act pop")
+
+const monitors = stepsFor("standard").find(s => s.id === "monitors")
+assert.ok(matches(monitors, { key: "Tab", meta: false, alt: true, ctrl: true, shift: false }))
+assert.strictEqual(monitors.minMonitors, 2)
+assert.ok(String(monitors.demo.command.slice(-1)[0]).indexOf("hl.dsp.focus") !== -1)
+
+const bar = stepsFor("standard").find(s => s.id === "bar")
+assert.strictEqual(bar.diagram, "none")
+assert.strictEqual(menu.diagram, "none")
+assert.strictEqual(stepsFor("standard").find(s => s.id === "apps-open").diagram, "none")
+assert.strictEqual(lengthMeta({ monitors: 1 })[1].detail.indexOf("two monitors"), -1)
+assert.ok(lengthMeta({ hasAgent: false })[0].detail.indexOf("agent") === -1)
+
+const empty = parseState("")
+assert.strictEqual(empty.completed, false)
+assert.strictEqual(empty.skipped, false)
+assert.strictEqual(empty.seen, false)
+assert.strictEqual(empty.length, "standard")
+assert.strictEqual(chipNudge(empty), true)
+assert.strictEqual(chipNudge(parseState('{"completed":true}')), false)
+assert.strictEqual(chipNudge(parseState('{"skipped":true}')), false)
+assert.strictEqual(chipNudge(parseState('{"seen":true}')), false)
+assert.strictEqual(parseState('{"completed":true,"length":"short"}').length, "short")
+assert.ok(serializeState(true, "extensive", false).indexOf('"length": "extensive"') !== -1)
+assert.ok(serializeState(false, "standard", true).indexOf('"skipped": true') !== -1)
+assert.ok(serializeState(false, "standard", false, true).indexOf('"seen": true') !== -1)
+
+assert.ok(stepsFor("short", { hasAgent: false }).map(s => s.id).indexOf("agent") === -1)
+assert.ok(stepsFor("short", { hasAgent: true }).map(s => s.id).indexOf("agent") !== -1)
+assert.strictEqual(stepsFor("short", { laptop: false }).map(s => s.id).join(","), shortIds.join(","))
+
+assert.strictEqual(sandbox.hasKeycaps(stepAt("short", lastIndex("short"))), false)
+assert.strictEqual(sandbox.hasKeycaps(menu), true)
+
+const meta = lengthMeta()
+assert.strictEqual(meta.length, 3)
+assert.strictEqual(meta[0].count, shortIds.length)
+assert.strictEqual(meta[1].count, standardIds.length)
+assert.strictEqual(meta[2].count, extensiveIds.length)
+assert.ok(lengthMeta({ monitors: 1 })[1].count === standardIds.length - 1)
+
+const ids = allSteps().map(s => s.id)
+assert.strictEqual(ids.length, new Set(ids).size)
+
+for (const step of allSteps()) {
+  assert.ok(step.title && step.body, step.id + " needs copy")
+  assert.ok(["none", "top", "center"].indexOf(step.spotlight) !== -1, step.id + " spotlight")
+  assert.ok(step.tracks && step.tracks.length, step.id + " tracks")
+  assert.ok(knownDiagrams().indexOf(step.diagram) !== -1, step.id + " diagram")
+}
+
+console.log("ok  short " + shortIds.length + " / standard " + standardIds.length + " / extensive " + extensiveIds.length)
