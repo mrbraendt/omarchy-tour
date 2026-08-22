@@ -20,7 +20,7 @@ Submitted: https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/13
 | Name | Tour |
 | Category | Desktop |
 | Tags | `tour`, `onboarding`, `bar`, `hyprland` |
-| Short description | Interactive desktop tour for Omarchy. The bar chip starts it; lessons wait for the shortcut, or Enter shows you. |
+| Short description | Interactive desktop tour for Omarchy. Learn and understand the keyboard, keybindings, shortcuts, tiling windows, workspaces, menu, and bar. Getting-started tutorial and onboarding guide for beginners. Start it by clicking the button "Tour" in the bar. |
 | Author | herr-brandt |
 
 ## Publish locally, then GitHub

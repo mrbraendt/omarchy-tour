@@ -7,6 +7,21 @@ function lengthIds() {
 function allSteps() {
   return [
     {
+      id: "apps-ahead",
+      title: "Opening applications",
+      body: "The next cards show how to open the menu, your files, the browser, and a terminal.",
+      section: "apps",
+      kind: "title",
+      keys: [],
+      keycaps: [],
+      spotlight: "none",
+      diagram: "none",
+      enter: "continue",
+      demo: null,
+      resumeMs: 0,
+      tracks: ["short", "standard", "extensive"]
+    },
+    {
       id: "menu",
       title: "The menu",
       body: "Super + Space opens every app and setting.",
@@ -67,7 +82,7 @@ function allSteps() {
     },
     {
       id: "windows-ahead",
-      title: "Window Management in Omarchy",
+      title: "Window Management",
       body: "Opened windows share the screen instead of stacking. The next cards show how to move, swap, float, and close them.",
       section: "windows",
       kind: "title",

@@ -1,6 +1,7 @@
 # Tour
 
-An interactive tour of the Omarchy desktop. It is not a keybinding list.
+An interactive tour of the Omarchy desktop. Learn and understand the
+keyboard, keybindings, shortcuts, tiling windows, workspaces, and the bar.
 
 A card sits at the bottom of the screen, names one idea, and waits. Press the
 shortcut to try it. Enter shows you. Escape closes. The **Tour** chip on the
