@@ -8,19 +8,75 @@ import time
 n = sys.argv[1] if len(sys.argv) > 1 else "1"
 
 DIGITS = {
+    "0": [
+        " ██████ ",
+        "██    ██",
+        "██    ██",
+        "██    ██",
+        " ██████ ",
+    ],
     "1": [
-        "  ██  ",
-        " ███  ",
-        "  ██  ",
-        "  ██  ",
-        "██████",
+        "   ██   ",
+        " ████   ",
+        "   ██   ",
+        "   ██   ",
+        " ██████ ",
     ],
     "2": [
-        "██████",
-        "     █",
-        "██████",
-        "█     ",
-        "██████",
+        " ██████ ",
+        "      ██",
+        " ██████ ",
+        "██      ",
+        "████████",
+    ],
+    "3": [
+        " ██████ ",
+        "      ██",
+        "  █████ ",
+        "      ██",
+        " ██████ ",
+    ],
+    "4": [
+        "██    ██",
+        "██    ██",
+        "████████",
+        "      ██",
+        "      ██",
+    ],
+    "5": [
+        "████████",
+        "██      ",
+        "███████ ",
+        "      ██",
+        " ██████ ",
+    ],
+    "6": [
+        " ██████ ",
+        "██      ",
+        "███████ ",
+        "██    ██",
+        " ██████ ",
+    ],
+    "7": [
+        "████████",
+        "     ██ ",
+        "    ██  ",
+        "   ██   ",
+        "  ██    ",
+    ],
+    "8": [
+        " ██████ ",
+        "██    ██",
+        " ██████ ",
+        "██    ██",
+        " ██████ ",
+    ],
+    "9": [
+        " ██████ ",
+        "██    ██",
+        " ███████",
+        "      ██",
+        " ██████ ",
     ],
 }
 
@@ -30,11 +86,24 @@ def size():
     return max(1, cols), max(1, rows)
 
 
+def art_for(label):
+    chars = [ch for ch in str(label) if ch in DIGITS]
+    if not chars:
+        chars = ["1"]
+    rows = [""] * 5
+    for i, ch in enumerate(chars):
+        digit = DIGITS[ch]
+        gap = "  " if i else ""
+        for r in range(5):
+            rows[r] += gap + digit[r]
+    return rows
+
+
 def draw(_signum=None, _frame=None):
     cols, rows = size()
-    art = DIGITS.get(n, DIGITS["1"])
-    label = "tour demo window %s" % n
-    block = art + ["", label]
+    art = art_for(n)
+    caption = "window %s" % n
+    block = art + ["", caption]
     height = len(block)
     width = max(len(line) for line in block)
     top = max(0, (rows - height) // 2)

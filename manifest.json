@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.herr-brandt.tour",
   "name": "Tour",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "author": "herr-brandt",
   "license": "MIT",
-  "description": "Interactive desktop tour for Omarchy. Learn and understand the keyboard, keybindings, shortcuts, tiling windows, workspaces, menu, and bar. Getting-started tutorial and onboarding guide for beginners. Start it by clicking the button \"Tour\" in the bar.",
+  "description": "Interactive desktop tour for Omarchy. Learn and understand the keyboard, keybindings, shortcuts, tiling windows, workspaces, menu, and bar. Optional window playground to practice tiling with demo windows. Getting-started tutorial and onboarding guide for beginners. Start it by clicking the button \"Tour\" in the bar.",
   "kinds": ["overlay", "bar-widget", "service"],
   "keepLoaded": true,
   "entryPoints": {

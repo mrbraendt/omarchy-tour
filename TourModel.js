@@ -1,11 +1,14 @@
 // Pure tour script. QML maps Qt keys to { key, meta, alt, ctrl, shift }.
 
+var cachedAllSteps = null
+
 function lengthIds() {
   return ["short", "standard", "extensive"]
 }
 
 function allSteps() {
-  return [
+  if (cachedAllSteps) return cachedAllSteps
+  cachedAllSteps = [
     {
       id: "apps-ahead",
       title: "Opening applications",
@@ -78,7 +81,7 @@ function allSteps() {
       demo: { command: ["omarchy-launch-terminal"] },
       resumeMs: 2500,
       trackLaunches: true,
-      tracks: ["short", "standard", "extensive"]
+      tracks: ["standard", "extensive"]
     },
     {
       id: "windows-ahead",
@@ -173,7 +176,7 @@ function allSteps() {
       id: "float",
       title: "Pop a window out",
       section: "windows",
-      body: "Super + O pops a window out so it stays on top — handy for a video or a calculator. Super + T just lets you drag a window freely.",
+      body: "Super + letter O pops a window out so it stays on top — handy for a video or a calculator. Super + T just lets you drag a window freely.",
       keys: [{ key: "O", meta: true, alt: false, ctrl: false, shift: false, command: ["omarchy-hyprland-window-pop"] }],
       keycaps: ["Super", "O"],
       spotlight: "none",
@@ -185,20 +188,19 @@ function allSteps() {
       tracks: ["extensive"]
     },
     {
-      id: "demo-offer",
-      title: "Help with two or more windows",
-      body: "Need two windows to try this? Press Enter, then use the shortcuts below.",
+      id: "fullscreen",
+      title: "Full screen",
       section: "windows",
-      keys: [],
-      keycaps: ["Enter (spawn two windows)"],
+      body: "Click a tiled window, then Super + F to fill the screen. It does not work on a popped-out window. Super + F again leaves full screen — otherwise you cannot use the other windows.",
+      keys: [{ key: "F", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.window.fullscreen({ mode = \"fullscreen\" })"] }],
+      keycaps: ["Super", "F"],
       spotlight: "none",
-      diagram: "none",
+      diagram: "fullscreen",
       enter: "demo",
-      demo: { command: ["tour-demo", "spawn", "2"] },
-      resumeMs: 2500,
+      demo: { command: ["hyprctl", "dispatch", "hl.dsp.window.fullscreen({ mode = \"fullscreen\" })"] },
+      resumeMs: 1800,
       letThrough: true,
-      trackLaunches: true,
-      tracks: ["short", "standard", "extensive"]
+      tracks: ["extensive"]
     },
     {
       id: "close",
@@ -216,9 +218,23 @@ function allSteps() {
       tracks: ["short", "standard", "extensive"]
     },
     {
+      id: "playground-offer",
+      title: "Window playground (optional)",
+      body: "A few tiny challenges with demo windows, then you can mess around. Skip if you want the bar.",
+      section: "windows",
+      keys: [],
+      keycaps: ["Enter"],
+      spotlight: "none",
+      diagram: "none",
+      enter: "playground",
+      demo: null,
+      resumeMs: 0,
+      tracks: ["short", "standard", "extensive"]
+    },
+    {
       id: "bar",
       title: "The bar",
-      body: "This strip along the edge of the screen is the bar — time, wifi, and volume live here. Drag it to another edge if you like. Double-click empty space to toggle transparency. Click Tour anytime to replay this walkthrough.",
+      body: "Clock, wifi, and volume live on this strip. Drag it to another edge if you like.",
       section: "bar",
       kind: "title",
       keys: [],
@@ -380,6 +396,7 @@ function allSteps() {
       tracks: ["short", "standard", "extensive"]
     }
   ]
+  return cachedAllSteps
 }
 
 function includesLength(step, length) {
@@ -431,7 +448,7 @@ function isLaptopFrom(opts) {
 }
 
 function knownDiagrams() {
-  return ["none", "tiling", "workspaces", "move", "snap", "monitors", "float", "resize"]
+  return ["none", "tiling", "workspaces", "move", "snap", "monitors", "float", "resize", "fullscreen"]
 }
 
 function parseSpotlight(value) {
@@ -528,6 +545,250 @@ function resizeRightKey(opts) {
   return prettyKeysym((opts && opts.resizeRight) || "equal") || "="
 }
 
+function prettyKeycap(cap) {
+  if (String(cap) === "O") return "letter O"
+  return String(cap || "")
+}
+
+function prettyKeycaps(list) {
+  var out = []
+  if (!list || !list.length) return out
+  for (var i = 0; i < list.length; i++) out.push(prettyKeycap(list[i]))
+  return out
+}
+
+function playgroundHintMs() {
+  return 8000
+}
+
+function playgroundWindowCount(length) {
+  var id = normalizeLength(length)
+  if (id === "short") return 2
+  if (id === "extensive") return 4
+  return 3
+}
+
+function playgroundTask(id, phase, kind, goal, keycaps) {
+  return {
+    id: id,
+    phase: phase,
+    kind: kind,
+    goal: goal,
+    keycaps: keycaps || []
+  }
+}
+
+function playgroundTasks(length, opts) {
+  var id = normalizeLength(length)
+  var tasks = [
+    playgroundTask("float-coach", "coach", "float", "Float the selected window", ["Super", "T"]),
+    playgroundTask("tile-recall", "recall", "tile", "Tile it again so it fills a gap", ["Super", "T"])
+  ]
+  if (id === "short") {
+    tasks.push(playgroundTask("pop-coach", "coach", "pop", "Pop a window out on top", ["Super", "O"]))
+    tasks.push(playgroundTask("fullscreen-coach", "coach", "fullscreen", "Full-screen a tiled window, not the popup", ["Super", "F"]))
+    tasks.push(playgroundTask("unfullscreen-coach", "coach", "unfullscreen", "Press Super + F again to leave full screen", ["Super", "F"]))
+    tasks.push(playgroundTask("close-coach", "coach", "close", "Close the selected window", ["Super", "W"]))
+    return tasks
+  }
+  tasks.push(playgroundTask("focus-coach", "coach", "focus", "Jump to another tiled window", ["Super", "arrows"]))
+  tasks.push(playgroundTask("swap-coach", "coach", "swap", "Swap two tiled windows", ["Super", "Shift", "arrows"]))
+  tasks.push(playgroundTask("pop-coach", "coach", "pop", "Pop a window out on top", ["Super", "O"]))
+  tasks.push(playgroundTask("fullscreen-coach", "coach", "fullscreen", "Full-screen a tiled window, not the popup", ["Super", "F"]))
+  tasks.push(playgroundTask("unfullscreen-coach", "coach", "unfullscreen", "Press Super + F again to leave full screen", ["Super", "F"]))
+  return tasks
+}
+
+function isDemoClient(client) {
+  if (!client) return false
+  var cls = String(client.class || "")
+  var initial = String(client.initialClass || "")
+  return cls === "io.github.herr-brandt.tour.demo" || initial === "io.github.herr-brandt.tour.demo"
+}
+
+function clientFloating(client) {
+  if (!client) return false
+  if (client.floating === true) return true
+  var n = Number(client.floating)
+  return isFinite(n) && n > 0
+}
+
+function clientFullscreen(client) {
+  if (!client) return false
+  if (client.fullscreen === true) return true
+  var n = Number(client.fullscreen)
+  if (isFinite(n) && n > 0) return true
+  var mode = Number(client.fullscreenMode)
+  return isFinite(mode) && mode > 0
+}
+
+function playgroundLayout(clients) {
+  var demos = []
+  var focus = ""
+  if (!clients || !clients.length) return { demos: demos, focus: focus, count: 0 }
+  for (var i = 0; i < clients.length; i++) {
+    var client = clients[i]
+    if (!client || client.mapped === false) continue
+    if (!isDemoClient(client)) continue
+    var at = client.at || [0, 0]
+    var size = client.size || [0, 0]
+    var addr = String(client.address || "")
+    var hist = Number(client.focusHistoryID)
+    demos.push({
+      address: addr,
+      x: Number(at[0]) || 0,
+      y: Number(at[1]) || 0,
+      w: Number(size[0]) || 0,
+      h: Number(size[1]) || 0,
+      floating: clientFloating(client),
+      pinned: !!client.pinned,
+      fullscreen: clientFullscreen(client),
+      focusHistoryID: isFinite(hist) ? hist : 99
+    })
+    if (hist === 0) focus = addr
+  }
+  demos.sort(function (a, b) {
+    if (a.x !== b.x) return a.x - b.x
+    return a.y - b.y
+  })
+  return { demos: demos, focus: focus, count: demos.length }
+}
+
+function playgroundByAddress(layout, address) {
+  if (!layout || !layout.demos) return null
+  for (var i = 0; i < layout.demos.length; i++) {
+    if (layout.demos[i].address === address) return layout.demos[i]
+  }
+  return null
+}
+
+function playgroundLeftmost(layout) {
+  if (!layout || !layout.demos || !layout.demos.length) return ""
+  return layout.demos[0].address
+}
+
+function playgroundSucceeded(task, before, after) {
+  if (!task || !after) return false
+  var kind = String(task.kind || "")
+  var prev = before || { demos: [], focus: "", count: 0 }
+  var i
+  if (kind === "close") return after.count < prev.count
+  if (kind === "focus") return !!after.focus && after.focus !== prev.focus
+  if (kind === "float") {
+    for (i = 0; i < after.demos.length; i++) {
+      var floated = after.demos[i]
+      var was = playgroundByAddress(prev, floated.address)
+      if (floated.floating && (!was || !was.floating)) return true
+    }
+    return false
+  }
+  if (kind === "tile") {
+    for (i = 0; i < after.demos.length; i++) {
+      var tiled = after.demos[i]
+      var prior = playgroundByAddress(prev, tiled.address)
+      if (!tiled.floating && prior && prior.floating) return true
+    }
+    return false
+  }
+  if (kind === "swap") return after.count === prev.count && after.count >= 2 && playgroundLeftmost(after) !== playgroundLeftmost(prev)
+  if (kind === "move") {
+    for (i = 0; i < after.demos.length; i++) {
+      var moved = after.demos[i]
+      var from = playgroundByAddress(prev, moved.address)
+      if (!from) continue
+      if (Math.abs(moved.x - from.x) >= 80 || Math.abs(moved.y - from.y) >= 80) return true
+    }
+    return false
+  }
+  if (kind === "resize") {
+    for (i = 0; i < after.demos.length; i++) {
+      var sized = after.demos[i]
+      var old = playgroundByAddress(prev, sized.address)
+      if (!old) continue
+      if (Math.abs(sized.w - old.w) >= 80 || Math.abs(sized.h - old.h) >= 80) return true
+    }
+    return false
+  }
+  if (kind === "pop") {
+    for (i = 0; i < after.demos.length; i++) {
+      var popped = after.demos[i]
+      var beforePop = playgroundByAddress(prev, popped.address)
+      if (popped.pinned && (!beforePop || !beforePop.pinned)) return true
+    }
+    return false
+  }
+  if (kind === "fullscreen") {
+    for (i = 0; i < after.demos.length; i++) {
+      var full = after.demos[i]
+      var beforeFull = playgroundByAddress(prev, full.address)
+      if (full.fullscreen && (!beforeFull || !beforeFull.fullscreen)) return true
+    }
+    return false
+  }
+  if (kind === "unfullscreen") {
+    for (i = 0; i < after.demos.length; i++) {
+      var restored = after.demos[i]
+      var wasFull = playgroundByAddress(prev, restored.address)
+      if (!restored.fullscreen && wasFull && wasFull.fullscreen) return true
+    }
+    return false
+  }
+  return false
+}
+
+function playgroundKeyCommand(ev, opts) {
+  if (!ev || !ev.meta || ev.alt || ev.ctrl) return null
+  var key = String(ev.key || "")
+  if (ev.shift) {
+    if (key === "Left") return ["hyprctl", "dispatch", "hl.dsp.window.swap({ direction = \"l\" })"]
+    if (key === "Right") return ["hyprctl", "dispatch", "hl.dsp.window.swap({ direction = \"r\" })"]
+    if (key === "Up") return ["hyprctl", "dispatch", "hl.dsp.window.swap({ direction = \"u\" })"]
+    if (key === "Down") return ["hyprctl", "dispatch", "hl.dsp.window.swap({ direction = \"d\" })"]
+    return null
+  }
+  if (key === "T") return ["hyprctl", "dispatch", "hl.dsp.window.float({ action = \"toggle\" })"]
+  if (key === "O") return ["omarchy-hyprland-window-pop"]
+  if (key === "F") return ["hyprctl", "dispatch", "hl.dsp.window.fullscreen({ mode = \"fullscreen\" })"]
+  if (key === "W") return ["hyprctl", "dispatch", "hl.dsp.window.close()"]
+  if (key === "Left") return ["hyprctl", "dispatch", "hl.dsp.focus({ direction = \"l\" })"]
+  if (key === "Right") return ["hyprctl", "dispatch", "hl.dsp.focus({ direction = \"r\" })"]
+  if (key === "Up") return ["hyprctl", "dispatch", "hl.dsp.focus({ direction = \"u\" })"]
+  if (key === "Down") return ["hyprctl", "dispatch", "hl.dsp.focus({ direction = \"d\" })"]
+  var left = resizeLeftKey(opts)
+  var right = resizeRightKey(opts)
+  if (key === "Minus" || key === "ß" || key === left)
+    return ["hyprctl", "dispatch", "hl.dsp.window.resize({ x = -100, y = 0, relative = true })"]
+  if (key === "Equal" || key === "´" || key === right)
+    return ["hyprctl", "dispatch", "hl.dsp.window.resize({ x = 100, y = 0, relative = true })"]
+  return null
+}
+
+function isPlaygroundStep(step) {
+  return !!(step && step.id === "playground-offer")
+}
+
+function windowPracticeRows(length, opts, extra) {
+  var id = normalizeLength(length)
+  var rows = [{ caps: ["Super", "T"], does: "Float the selected window, then drag it" }]
+  if (id === "standard" || id === "extensive") {
+    rows.push({ caps: ["Super", "arrows"], does: "Jump to the next tiled window" })
+    rows.push({ caps: ["Super", "Shift", "arrows"], does: "Swap two tiled windows" })
+    rows.push({ caps: ["Super", "Mouse L"], does: "Hold Super and drag to move" })
+  }
+  if (id === "extensive")
+    rows.push({ caps: ["Super", resizeLeftKey(opts)], does: "Shrink or grow the split" })
+  rows.push({ caps: ["Super", "O"], does: "Pop a window out on top (letter O)" })
+  rows.push({ caps: ["Super", "F"], does: "Full screen a tiled window" })
+  rows.push({ caps: ["Super", "F"], does: "Press Super + F again to leave full screen" })
+  if (extra && extra.close)
+    rows.push({ caps: ["Super", "W"], does: "Close the selected window" })
+  return rows
+}
+
+function playgroundKeyGuide(length, opts) {
+  return windowPracticeRows(length, opts, { close: true })
+}
+
 function resolveStep(step, opts) {
   if (!step) return null
   var copy = {}
@@ -556,20 +817,15 @@ function resolveStep(step, opts) {
       keys.push({ key: rightNames[i], meta: true, alt: false, ctrl: false, shift: false, command: rightCmd })
     copy.keys = keys
   }
-  if (step.id === "demo-offer") {
-    copy.keycaps = ["Enter (spawn two windows)"]
-    var rows = [{ caps: ["Super", "T"], does: "Float the selected window, then drag it" }]
-    var length = (opts && opts.tourLength) || ""
-    if (length === "standard" || length === "extensive") {
-      rows.push({ caps: ["Super", "arrows"], does: "Jump to the next tiled window" })
-      rows.push({ caps: ["Super", "Shift", "arrows"], does: "Swap two tiled windows" })
-      rows.push({ caps: ["Super", "Mouse L"], does: "Hold Super and drag to move" })
-    }
-    if (length === "extensive") {
-      rows.push({ caps: ["Super", resizeLeftKey(opts)], does: "Shrink or grow the split" })
-      rows.push({ caps: ["Super", "O"], does: "Keep a window on top" })
-    }
-    copy.practiceCaps = rows
+  if (step.id === "windows-ahead") {
+    var winLength = (opts && opts.tourLength) || ""
+    if (winLength === "extensive")
+      copy.body = "Opened windows share the screen instead of stacking. The next cards show how to move, swap, resize, pop out, full-screen, and close them."
+  }
+  if (step.id === "apps-ahead") {
+    var appsLength = (opts && opts.tourLength) || ""
+    if (appsLength === "short")
+      copy.body = "The next cards show how to open the menu, your files, and the browser."
   }
   if (step.id === "extras-ahead") {
     var extraLength = (opts && opts.tourLength) || ""
@@ -630,22 +886,19 @@ function lengthMeta(opts) {
       id: "short",
       key: "1",
       label: "Short Tour",
-      detail: shortDetail,
-      count: stepsFor("short", opts).length
+      detail: shortDetail
     },
     {
       id: "standard",
       key: "2",
       label: "Standard Tour",
-      detail: standardDetail,
-      count: stepsFor("standard", opts).length
+      detail: standardDetail
     },
     {
       id: "extensive",
       key: "3",
       label: "Extensive Tour",
-      detail: "Resize, pop-out windows, keybindings, and themes",
-      count: stepsFor("extensive", opts).length
+      detail: "Resize, pop-out, full screen, keybindings, and themes"
     }
   ]
 }
@@ -813,7 +1066,7 @@ function overviewGroups(length, opts) {
     }
     current.items.push({
       id: step.id,
-      title: step.title,
+      title: step.id === "playground-offer" ? "Playground" : step.title,
       keys: keys,
       index: i
     })

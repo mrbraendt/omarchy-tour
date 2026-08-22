@@ -31,6 +31,16 @@ Item {
   property bool hasAgent: true
   property bool isLaptop: true
   property var skipSnapshot: null
+  property bool playgroundActive: false
+  property bool playgroundWaiting: false
+  property bool playgroundFree: false
+  property bool playgroundHinted: false
+  property bool playgroundPulse: false
+  property int playgroundIndex: 0
+  property int playgroundNeed: 2
+  property var playgroundTaskList: []
+  property var playgroundTask: null
+  property var playgroundBaseline: null
 
   readonly property string pluginId: (root.manifest && root.manifest.id) || "io.github.herr-brandt.tour"
   readonly property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/tour.json"
@@ -39,16 +49,25 @@ Item {
   property string kbLayout: "us"
   property string resizeLeftSym: "minus"
   property string resizeRightSym: "equal"
-  readonly property var lengthOptions: TourModel.lengthMeta(root.trackOpts())
-  readonly property int stepTotal: TourModel.stepsFor(root.lengthId, root.trackOpts()).length
-  readonly property bool canGoBack: !root.choosing && root.stepIndex > 0
-  readonly property bool canGoForward: !root.choosing && root.stepIndex < Math.max(0, root.stepTotal - 1)
-  readonly property bool onLast: !root.choosing && TourModel.isLast(root.lengthId, root.stepIndex, root.trackOpts())
+  readonly property var lengthOptions: TourModel.lengthMeta(root.filterOpts())
+  readonly property int stepTotal: TourModel.stepsFor(root.lengthId, root.filterOpts()).length
+  readonly property bool canGoBack: !root.choosing && (
+    (root.playgroundActive && !root.playgroundWaiting && (root.playgroundFree || root.playgroundIndex > 0))
+    || (!root.playgroundActive && root.stepIndex > 0)
+  )
+  readonly property bool canGoForward: !root.choosing && (
+    root.playgroundActive
+    || root.stepIndex < Math.max(0, root.stepTotal - 1)
+  )
+  readonly property bool onLast: !root.choosing && TourModel.isLast(root.lengthId, root.stepIndex, root.filterOpts())
   readonly property string diagramKind: (!root.choosing && root.step && root.step.diagram) ? String(root.step.diagram) : "none"
   readonly property bool showHints: !root.choosing && (root.stepIndex === 0 || root.onLast)
-  readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.trackOpts())
-  readonly property var overviewGroups: TourModel.overviewGroups(root.lengthId, root.trackOpts())
-  readonly property bool letThrough: !root.choosing && !!(root.step && root.step.letThrough)
+  readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.filterOpts())
+  readonly property var overviewGroups: TourModel.overviewGroups(root.lengthId, root.filterOpts())
+  readonly property bool letThrough: !root.choosing && (root.playgroundActive || !!(root.step && root.step.letThrough))
+  readonly property bool playgroundShowingKeys: root.playgroundActive && !root.playgroundFree && !!root.playgroundTask
+    && (String(root.playgroundTask.phase || "") === "coach" || root.playgroundHinted)
+    && root.nonempty(root.playgroundTask.keycaps)
   readonly property var spotlight: TourModel.parseSpotlight(root.step && root.step.spotlight)
   readonly property var spotlightTargets: TourModel.parseSpotlights(root.step && root.step.spotlight)
   property color dimScrim: Util.alpha(Color.background, 0.58)
@@ -81,8 +100,14 @@ Item {
     1
   )
   readonly property var titleBorderSpec: Border.surfaceSpec("menu", "border", Color.accent, Math.max(2, Style.space(2)))
-  readonly property bool showKeycaps: !root.choosing && !root.titleCard && root.nonempty(root.keycaps)
+  readonly property bool showKeycaps: !root.choosing && !root.titleCard && (root.playgroundShowingKeys || root.nonempty(root.keycaps))
   readonly property var practiceCaps: (root.step && root.step.practiceCaps) ? root.step.practiceCaps : []
+  readonly property var keyGuide: root.playgroundFree
+    ? TourModel.playgroundKeyGuide(root.lengthId, {
+        resizeLeft: root.resizeLeftSym,
+        resizeRight: root.resizeRightSym
+      })
+    : root.practiceCaps
 
   function nonempty(list) {
     return !!(list && list.length)
@@ -319,6 +344,17 @@ Item {
 
   function ingestClients(data) {
     root.lastClientData = data || []
+    if (root.playgroundActive) {
+      var mapped = 0
+      if (data && data.length) {
+        for (var p = 0; p < data.length; p++) {
+          if (data[p] && data[p].mapped !== false) mapped++
+        }
+      }
+      if (root.clientCount !== mapped) root.clientCount = mapped
+      root.checkPlaygroundProgress()
+      return
+    }
     var n = 0
     var demos = []
     var fresh = []
@@ -354,7 +390,7 @@ Item {
       for (var a = 0; a < added.length; a++) nextTracked.push(added[a])
       root.trackedAddresses = nextTracked
     }
-    root.refreshSpotlight()
+    if (root.spotlightTargets.length) root.refreshSpotlight()
   }
 
   function addressIn(list, addr) {
@@ -388,10 +424,123 @@ Item {
     }
   }
 
-  function trackOpts() {
+  function closePlaygroundDemos() {
+    root.execTourCommand(["tour-demo", "close"])
+  }
+
+  function resetPlayground() {
+    playgroundHintTimer.stop()
+    playgroundPulseTimer.stop()
+    root.playgroundActive = false
+    root.playgroundWaiting = false
+    root.playgroundFree = false
+    root.playgroundHinted = false
+    root.playgroundPulse = false
+    root.playgroundIndex = 0
+    root.playgroundNeed = 2
+    root.playgroundTaskList = []
+    root.playgroundTask = null
+    root.playgroundBaseline = null
+  }
+
+  function leavePlayground() {
+    if (!root.playgroundActive && !root.playgroundWaiting) return
+    playgroundHintTimer.stop()
+    playgroundPulseTimer.stop()
+    playgroundSpawnTimer.stop()
+    root.closePlaygroundDemos()
+    root.resetPlayground()
+  }
+
+  function applyPlaygroundTask(index) {
+    var list = root.playgroundTaskList || []
+    if (index < 0) index = 0
+    if (index >= list.length) {
+      root.playgroundFree = true
+      root.playgroundTask = null
+      root.playgroundHinted = false
+      root.keycaps = []
+      root.practiced = false
+      playgroundHintTimer.stop()
+      root.refocus()
+      return
+    }
+    var task = list[index]
+    root.playgroundIndex = index
+    root.playgroundTask = task
+    root.playgroundFree = false
+    root.playgroundHinted = false
+    root.practiced = false
+    var caps = []
+    if (task && task.phase === "coach" && task.keycaps) {
+      for (var i = 0; i < task.keycaps.length; i++) caps.push(task.keycaps[i])
+    }
+    root.keycaps = caps
+    root.keyBeat = 0
+    root.playgroundBaseline = TourModel.playgroundLayout(root.lastClientData)
+    playgroundHintTimer.interval = TourModel.playgroundHintMs()
+    playgroundHintTimer.restart()
+    root.refocus()
+  }
+
+  function startPlayground() {
+    var session = TourModel.playgroundTasks(root.lengthId, root.trackOpts())
+    var need = TourModel.playgroundWindowCount(root.lengthId)
+    root.playgroundTaskList = session
+    root.playgroundNeed = need
+    root.playgroundIndex = 0
+    root.playgroundFree = false
+    root.playgroundHinted = false
+    root.playgroundPulse = false
+    root.playgroundTask = null
+    root.playgroundBaseline = null
+    root.playgroundWaiting = true
+    root.playgroundActive = true
+    root.practiced = false
+    root.keycaps = []
+    root.closePlaygroundDemos()
+    playgroundSpawnTimer.restart()
+    playgroundHintTimer.stop()
+    root.refreshClients()
+    root.refocus()
+  }
+
+  function finishPlayground() {
+    root.leavePlayground()
+    if (TourModel.isPlaygroundStep(root.step)) root.goForward()
+  }
+
+  function checkPlaygroundProgress() {
+    if (!root.playgroundActive || root.playgroundPulse) return
+    var layout = TourModel.playgroundLayout(root.lastClientData)
+    if (root.playgroundWaiting) {
+      if (layout.count >= root.playgroundNeed) {
+        root.playgroundWaiting = false
+        root.playgroundBaseline = layout
+        root.applyPlaygroundTask(0)
+      }
+      return
+    }
+    if (root.playgroundFree) return
+    if (!root.playgroundTask) return
+    if (TourModel.playgroundSucceeded(root.playgroundTask, root.playgroundBaseline, layout))
+      root.completePlaygroundTask()
+  }
+
+  function completePlaygroundTask() {
+    root.playgroundPulse = true
+    playgroundHintTimer.stop()
+    playgroundPulseTimer.restart()
+  }
+
+  function afterPlaygroundPulse() {
+    root.playgroundPulse = false
+    root.applyPlaygroundTask(root.playgroundIndex + 1)
+  }
+
+  function filterOpts() {
     return {
       monitors: root.skipSnapshot ? root.skipSnapshot.monitors : root.monitorCount,
-      clients: root.clientCount,
       hasAgent: root.skipSnapshot ? root.skipSnapshot.hasAgent : root.hasAgent,
       laptop: root.skipSnapshot ? root.skipSnapshot.laptop : root.isLaptop,
       kbLayout: root.kbLayout,
@@ -399,6 +548,12 @@ Item {
       resizeRight: root.resizeRightSym,
       launchCount: (root.trackedAddresses && root.trackedAddresses.length) ? root.trackedAddresses.length : 0
     }
+  }
+
+  function trackOpts() {
+    var opts = root.filterOpts()
+    opts.clients = root.clientCount
+    return opts
   }
 
   function pluginFile(name) {
@@ -439,18 +594,22 @@ Item {
     root.runLights(args)
   }
 
-  function probeAll() {
-    monitorProbe.running = false
-    monitorProbe.running = true
-    clientProbe.running = false
+  function refreshClients() {
+    if (clientProbe.running) return
     clientProbe.running = true
-    laptopProbe.running = false
-    laptopProbe.running = true
-    agentProbe.running = false
-    agentProbe.running = true
+  }
+
+  function probeLayout() {
+    if (!monitorProbe.running) monitorProbe.running = true
+    root.refreshClients()
+  }
+
+  function probeAll() {
+    root.probeLayout()
+    if (!laptopProbe.running) laptopProbe.running = true
+    if (!agentProbe.running) agentProbe.running = true
     keymapProbe.command = ["python3", root.pluginFile("tour-keymap.py")]
-    keymapProbe.running = false
-    keymapProbe.running = true
+    if (!keymapProbe.running) keymapProbe.running = true
   }
 
   Component.onCompleted: root.probeAll()
@@ -504,6 +663,14 @@ Item {
     Quickshell.execDetached(out)
   }
 
+  function dispatchPlaygroundKey(ev) {
+    var cmd = TourModel.playgroundKeyCommand(ev, root.trackOpts())
+    if (!cmd || !cmd.length) return false
+    root.execTourCommand(cmd)
+    root.refreshClients()
+    return true
+  }
+
   function open(payloadJson) {
     var payload = ({})
     try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
@@ -515,6 +682,7 @@ Item {
     root.overviewing = false
     root.skipSnapshot = null
     root.markSeen()
+    root.leavePlayground()
     if (payload.length) {
       root.startLength(payload.length)
     } else {
@@ -538,6 +706,7 @@ Item {
     root.overviewing = false
     root.opened = false
     root.closeTrackedWindows()
+    root.leavePlayground()
     root.runLights(["restore"])
   }
 
@@ -549,6 +718,7 @@ Item {
     root.overviewing = false
     root.opened = false
     root.closeTrackedWindows()
+    root.leavePlayground()
     root.runLights(["restore"])
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide(root.pluginId)
@@ -575,6 +745,7 @@ Item {
   }
 
   function loadStep(index) {
+    if (root.playgroundActive) root.leavePlayground()
     var prev = root.step
     var next = TourModel.stepAt(root.lengthId, index, root.trackOpts())
     var caps = []
@@ -623,7 +794,18 @@ Item {
   }
 
   function goBack() {
-    if (root.choosing || root.stepIndex <= 0) return
+    if (root.choosing) return
+    if (root.playgroundActive) {
+      if (root.playgroundWaiting) return
+      if (root.playgroundFree) {
+        var list = root.playgroundTaskList || []
+        root.applyPlaygroundTask(Math.max(0, list.length - 1))
+        return
+      }
+      if (root.playgroundIndex > 0) root.applyPlaygroundTask(root.playgroundIndex - 1)
+      return
+    }
+    if (root.stepIndex <= 0) return
     var list = TourModel.stepsFor(root.lengthId, root.trackOpts())
     var currentId = root.step ? root.step.id : ""
     var here = -1
@@ -636,6 +818,12 @@ Item {
 
   function goForward() {
     if (root.choosing) return
+    if (root.playgroundActive) {
+      if (root.playgroundWaiting) return
+      if (root.playgroundFree) root.finishPlayground()
+      else root.applyPlaygroundTask(root.playgroundIndex + 1)
+      return
+    }
     if (root.onLast) {
       root.onLastEnter()
       return
@@ -667,6 +855,7 @@ Item {
   }
 
   function practice(ev) {
+    if (root.playgroundActive) return
     if (root.paused || root.practiced) return
     root.practiced = true
     var cmd = TourModel.demoCommand(root.step, ev)
@@ -696,13 +885,22 @@ Item {
       root.startLength(root.highlightedLength === 0 ? "short" : (root.highlightedLength === 2 ? "extensive" : "standard"))
       return
     }
+    if (root.playgroundActive) {
+      if (root.playgroundFree) root.finishPlayground()
+      return
+    }
     var action = TourModel.enterAction(root.step)
-    if (action === "finish" || action === "overview") root.onLastEnter()
+    if (action === "playground") root.startPlayground()
+    else if (action === "finish" || action === "overview") root.onLastEnter()
     else if (action === "demo") root.runDemo(root.step)
     else root.goForward()
   }
 
   function onEscape() {
+    if (root.playgroundActive) {
+      root.finishPlayground()
+      return
+    }
     root.dismiss()
   }
 
@@ -1018,6 +1216,42 @@ Item {
       }
     }
 
+    // fullscreen: one tile expands to fill
+    Item {
+      id: fullStage
+      visible: diagram.kind === "fullscreen"
+      anchors.fill: parent
+      anchors.margins: Style.space(14)
+      property real grow: 0
+
+      SequentialAnimation on grow {
+        running: fullStage.visible && root.panelVisible && !root.paused
+        loops: Animation.Infinite
+        PauseAnimation { duration: 400 }
+        NumberAnimation { to: 1; duration: 640; easing.type: Easing.OutCubic }
+        PauseAnimation { duration: 700 }
+        NumberAnimation { to: 0; duration: 480; easing.type: Easing.InCubic }
+        PauseAnimation { duration: 360 }
+      }
+
+      Row {
+        anchors.fill: parent
+        spacing: diagram.gap
+        opacity: 1 - fullStage.grow * 0.7
+        Rectangle { width: (parent.width - diagram.gap) * 0.55; height: parent.height; radius: diagram.rad; color: diagram.paneHi }
+        Rectangle { width: (parent.width - diagram.gap) * 0.45; height: parent.height; radius: diagram.rad; color: diagram.pane }
+      }
+      Rectangle {
+        width: parent.width * (0.55 + 0.45 * fullStage.grow)
+        height: parent.height
+        radius: diagram.rad
+        color: diagram.paneHi
+        border.width: Math.max(1, Style.space(1))
+        border.color: Color.accent
+        opacity: fullStage.grow
+      }
+    }
+
     // resize: divider grows
     Item {
       id: resizeStage
@@ -1134,7 +1368,7 @@ Item {
     repeat: false
     onTriggered: {
       root.paused = false
-      root.probeAll()
+      root.probeLayout()
       root.refocus()
     }
   }
@@ -1146,19 +1380,51 @@ Item {
     onTriggered: {
       root.paused = false
       root.refocus()
+      if (root.playgroundActive) return
       if (root.onLast) root.finish()
       else root.goForward()
     }
   }
 
   Timer {
-    id: demoProbeTimer
-    interval: 500
+    id: playgroundSpawnTimer
+    interval: 240
     repeat: false
     onTriggered: {
-      clientProbe.running = false
-      clientProbe.running = true
+      if (!root.playgroundActive) return
+      root.execTourCommand(["tour-demo", "spawn", String(root.playgroundNeed)])
     }
+  }
+
+  Timer {
+    id: playgroundHintTimer
+    interval: 8000
+    repeat: false
+    onTriggered: {
+      if (!root.playgroundActive || root.playgroundFree || !root.playgroundTask) return
+      var caps = []
+      var task = root.playgroundTask
+      if (task.keycaps) {
+        for (var i = 0; i < task.keycaps.length; i++) caps.push(task.keycaps[i])
+      }
+      root.keycaps = caps
+      root.playgroundHinted = true
+    }
+  }
+
+  Timer {
+    id: playgroundPulseTimer
+    interval: 420
+    repeat: false
+    onTriggered: root.afterPlaygroundPulse()
+  }
+
+  Timer {
+    id: playgroundPollTimer
+    interval: 280
+    repeat: true
+    running: root.panelVisible && root.playgroundActive
+    onTriggered: root.refreshClients()
   }
 
   Timer {
@@ -1184,10 +1450,7 @@ Item {
         var kind = root.spotlightTargets[i].kind
         if (kind === "windows" || kind === "app") needsClients = true
       }
-      if (needsClients) {
-        clientProbe.running = false
-        clientProbe.running = true
-      }
+      if (needsClients) root.refreshClients()
       root.refreshSpotlight()
     }
   }
@@ -1297,7 +1560,9 @@ Item {
       width: Math.min(root.titleCard ? Style.space(560) : Style.space(620), parent.width - Style.space(56))
       height: inner.implicitHeight + root.cardPad * 2
       radius: root.cornerRadius
-      color: root.titleCard ? root.titleFill : root.background
+      color: root.playgroundPulse
+        ? root.titleFill
+        : (root.titleCard ? root.titleFill : root.background)
       clip: true
       borderSpec: root.titleCard ? root.titleBorderSpec : root.borderSpec
       anchors.horizontalCenter: parent.horizontalCenter
@@ -1334,38 +1599,7 @@ Item {
 
           Item {
             width: parent.width - Style.space(44) * 2 - Style.space(12) * 2
-            height: Style.space(44)
-
-            Rectangle {
-              id: pathTrack
-              anchors.verticalCenter: parent.verticalCenter
-              width: parent.width
-              height: Style.space(4)
-              radius: height / 2
-              color: Util.alpha(root.foreground, 0.12)
-
-              Rectangle {
-                width: pathTrack.width * ((root.stepIndex + 1) / Math.max(1, root.stepTotal))
-                height: parent.height
-                radius: height / 2
-                color: Color.accent
-                Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-              }
-
-              MouseArea {
-                anchors.fill: parent
-                anchors.topMargin: -Style.space(12)
-                anchors.bottomMargin: -Style.space(12)
-                cursorShape: Qt.PointingHandCursor
-                onClicked: function(mouse) {
-                  var total = Math.max(1, root.stepTotal)
-                  var i = Math.floor(mouse.x / width * total)
-                  if (i < 0) i = 0
-                  if (i > total - 1) i = total - 1
-                  root.applyStep(i)
-                }
-              }
-            }
+            height: Style.space(1)
           }
 
           NavArrow {
@@ -1396,8 +1630,8 @@ Item {
 
               Text {
                 width: parent.width
-                visible: root.titleCard
-                text: (root.step && root.step.id === "extras-ahead") ? "Optional" : "Coming up"
+                visible: root.titleCard || (root.step && root.step.id === "playground-offer" && !root.playgroundActive)
+                text: (root.step && (root.step.id === "extras-ahead" || root.step.id === "playground-offer")) ? "Optional" : "Coming up"
                 color: Color.accent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -1412,7 +1646,13 @@ Item {
                 Text {
                   id: titleText
                   width: parent.width - (root.practiced ? checkMark.width + Style.space(12) : 0)
-                  text: root.step ? root.step.title : ""
+                  text: root.playgroundActive
+                    ? (root.playgroundFree
+                      ? "Free play"
+                      : (root.playgroundWaiting
+                        ? "Setting up windows"
+                        : (root.playgroundTask ? root.playgroundTask.goal : "Window playground")))
+                    : (root.step ? root.step.title : "")
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.displayLarge
@@ -1429,7 +1669,7 @@ Item {
                   height: Style.space(28)
                   radius: width / 2
                   color: Color.accent
-                  visible: root.practiced && !root.titleCard
+                  visible: root.practiced && !root.titleCard && !root.playgroundActive
                   opacity: visible ? 1 : 0
                   Behavior on opacity { NumberAnimation { duration: 160 } }
 
@@ -1462,13 +1702,23 @@ Item {
             LessonDiagram {
               width: parent.width
               kind: root.diagramKind
-              visible: !root.overviewing && !root.titleCard
+              visible: !root.overviewing && !root.titleCard && !root.playgroundActive
             }
 
             Text {
               width: parent.width
               visible: !root.overviewing || (root.step && root.step.id === "done")
-              text: root.step ? root.step.body : ""
+              text: root.playgroundActive
+                ? (root.playgroundFree
+                  ? "The windows are yours. Press Enter to move to the next tour item."
+                  : (root.playgroundWaiting
+                    ? "Demo windows are opening…"
+                    : (root.playgroundHinted
+                      ? "A hint, if you want it."
+                      : (root.playgroundTask && root.playgroundTask.phase === "recall"
+                        ? "No key hints this time."
+                        : "Use the keys below."))))
+                : (root.step ? root.step.body : "")
               color: Color.muted
               font.family: root.fontFamily
               font.pixelSize: root.titleCard ? Style.font.heading : Style.font.title
@@ -1604,8 +1854,10 @@ Item {
             }
 
             Column {
-              visible: (root.showKeycaps || root.practiceCaps.length) && !root.overviewing
+              id: practiceTable
+              visible: (root.showKeycaps || root.keyGuide.length) && !root.overviewing
               spacing: Style.space(10)
+              property int keysColumnWidth: Style.space(240)
 
               Row {
                 visible: root.showKeycaps
@@ -1643,7 +1895,7 @@ Item {
                       Text {
                         id: keyLabel
                         anchors.centerIn: parent
-                        text: keyWrap.modelData
+                        text: TourModel.prettyKeycap(keyWrap.modelData)
                         color: keyWrap.struck ? root.background : root.foreground
                         font.family: root.fontFamily
                         font.pixelSize: Style.font.body
@@ -1655,7 +1907,7 @@ Item {
               }
 
               Text {
-                visible: root.practiceCaps.length > 0
+                visible: root.practiceCaps.length > 0 && !root.playgroundFree
                 text: "Try these again"
                 color: Color.muted
                 font.family: root.fontFamily
@@ -1664,12 +1916,12 @@ Item {
               }
 
               Repeater {
-                model: root.practiceCaps.length
+                model: root.keyGuide.length
                 delegate: Item {
                   id: practiceRow
                   required property int index
                   readonly property var row: {
-                    var item = root.practiceCaps[index]
+                    var item = root.keyGuide[index]
                     if (!item) return { caps: [], does: "" }
                     if (item.caps) return item
                     return { caps: item, does: "" }
@@ -1682,6 +1934,10 @@ Item {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
+                    onImplicitWidthChanged: {
+                      if (implicitWidth > practiceTable.keysColumnWidth)
+                        practiceTable.keysColumnWidth = implicitWidth
+                    }
 
                     Repeater {
                       model: practiceRow.row.caps || []
@@ -1695,7 +1951,7 @@ Item {
                         Text {
                           id: practiceCapLabel
                           anchors.centerIn: parent
-                          text: parent.modelData
+                          text: TourModel.prettyKeycap(parent.modelData)
                           color: root.foreground
                           font.family: root.fontFamily
                           font.pixelSize: Style.font.bodySmall
@@ -1705,12 +1961,26 @@ Item {
                     }
                   }
 
+                  Text {
+                    id: practiceDoes
+                    anchors.left: parent.left
+                    anchors.leftMargin: practiceTable.keysColumnWidth + Style.space(48)
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: practiceRow.row.does || ""
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignLeft
+                  }
+
                   Rectangle {
                     anchors.bottom: parent.bottom
                     width: parent.width
                     height: 1
                     color: Util.alpha(root.foreground, 0.08)
-                    visible: practiceRow.index < root.practiceCaps.length - 1
+                    visible: practiceRow.index < root.keyGuide.length - 1
                   }
                 }
               }
@@ -1841,16 +2111,22 @@ Item {
 
         Text {
           width: parent.width
-          visible: root.showHints
-          text: root.overviewing
+          visible: root.showHints || root.playgroundActive || (root.step && root.step.id === "playground-offer")
+          text: root.playgroundActive
+            ? (root.playgroundFree
+              ? "Press Enter to continue     Esc  to leave"
+              : "→  next task     Esc  to leave")
+            : (root.overviewing
             ? "Click a card to go back     ↑  ↓  to scroll     Enter  to finish     Esc  to close"
             : (TourModel.enterAction(root.step) === "overview"
               ? "Enter  to see the shortcuts     Esc  to close"
               : (TourModel.enterAction(root.step) === "finish"
             ? "Enter  to finish     Esc  to close"
-            : (root.step && root.step.keys && root.step.keys.length
+            : (TourModel.enterAction(root.step) === "playground"
+              ? "Enter  to play     →  to skip     Esc  to close"
+              : (root.step && root.step.keys && root.step.keys.length
               ? "←  →  lessons     Enter  to show me     Esc  to close"
-              : "←  →  lessons     Enter  to continue     Esc  to close")))
+              : "←  →  lessons     Enter  to continue     Esc  to close")))))
           color: Color.muted
           font.family: root.fontFamily
           font.pixelSize: Style.font.bodySmall
@@ -1905,6 +2181,24 @@ Item {
           var picked = TourModel.lengthFromKey(ev.key)
           if (picked) {
             root.startLength(picked)
+            event.accepted = true
+            return
+          }
+        }
+        if (root.playgroundActive) {
+          if (!ev.meta && !ev.alt && !ev.ctrl) {
+            if (ev.key === "Left") {
+              root.goBack()
+              event.accepted = true
+              return
+            }
+            if (ev.key === "Right") {
+              root.goForward()
+              event.accepted = true
+              return
+            }
+          }
+          if (root.dispatchPlaygroundKey(ev)) {
             event.accepted = true
             return
           }
