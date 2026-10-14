@@ -19,7 +19,7 @@ only writes `~/.local/state/omarchy/tour.json`.
 ## Install
 
 ```sh
-omarchy plugin add https://github.com/herr-brandt/omarchy-tour.git --enable
+omarchy plugin add https://github.com/mrbraendt/omarchy-tour.git --enable
 ```
 
 The bar chip is highlighted until you finish the tour or right-click it. It
@@ -88,7 +88,7 @@ Listing metadata for [omarchyplugins.com](https://omarchyplugins.com/):
 - Category: `Desktop`
 - Tags: `tour`, `onboarding`, `bar`, `hyprland`
 - License: MIT (see `LICENSE`)
-- Repository: `https://github.com/herr-brandt/omarchy-tour`
+- Repository: `https://github.com/mrbraendt/omarchy-tour`
 
 Filled-in form answers live in [`docs/marketplace.md`](docs/marketplace.md).
 

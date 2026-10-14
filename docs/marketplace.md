@@ -15,13 +15,13 @@ Submitted: https://github.com/HANCORE-linux/omarchy-plugin-marketplace/issues/13
 
 | Field | Value |
 | --- | --- |
-| Plugin repository | `https://github.com/herr-brandt/omarchy-tour` |
+| Plugin repository | `https://github.com/mrbraendt/omarchy-tour` |
 | Plugin ID | `io.github.herr-brandt.tour` |
 | Name | Tour |
 | Category | Desktop |
 | Tags | `tour`, `onboarding`, `bar`, `hyprland` |
 | Short description | Interactive desktop tour for Omarchy. Learn and understand the keyboard, keybindings, shortcuts, tiling windows, workspaces, menu, and bar. Getting-started tutorial and onboarding guide for beginners. Start it by clicking the button "Tour" in the bar. |
-| Author | herr-brandt |
+| Author | mrbraendt |
 
 ## Publish locally, then GitHub
 
@@ -31,7 +31,7 @@ node tests/tour-model.test.js
 python3 tests/tour-lights.test.py
 
 gh auth login
-gh repo create herr-brandt/omarchy-tour --public --source=. --remote=origin --push
+gh repo create mrbraendt/omarchy-tour --public --source=. --remote=origin --push
 ```
 
 Submitted with category Desktop and tags `bar`, `hyprland`, `quickshell`. Suggested extra tag: `onboarding`.
