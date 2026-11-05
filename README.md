@@ -11,7 +11,7 @@ Built for people arriving from Ubuntu, macOS, or Windows: there is no dock,
 windows tile instead of floating, and an AI agent can help set up the computer
 if you connect a ChatGPT-style subscription.
 
-Requires [Omarchy Quattro](https://omarchy.org/). No extra packages. No sudo.
+Requires [Omarchy Quattro](https://omarchy.org/) (tested on 4.5). No extra packages. No sudo.
 
 The plugin does not edit Hyprland, `shell.json`, or `omarchy-menu.jsonc`. It
 only writes `~/.local/state/omarchy/tour.json`.

@@ -280,7 +280,7 @@ function allSteps() {
     {
       id: "bar-right",
       title: "The bar: the other end",
-      body: "The right side is wifi, volume, bluetooth, and power. Click a chip to change it — the same kinds of controls you would look for in the bottom-right on Windows or the top-right on a Mac.",
+      body: "The right side is wifi, volume, bluetooth, your AI agents, and power, plus tray icons from running apps. Click a chip to change it — the same kinds of controls you would look for in the bottom-right on Windows or the top-right on a Mac.",
       section: "bar",
       keys: [],
       keycaps: [],

@@ -185,14 +185,23 @@ Item {
     return fallback ? root.padRect(fallback, pad) : null
   }
 
+  // Omarchy 4.5 splits the bar middle into centerBegin / center / centerEnd
+  // and gives the tray its own region at the right end.
+  function barRegions(section) {
+    if (section === "center") return ["centerBegin", "center", "centerEnd"]
+    if (section === "right") return ["right", "tray"]
+    return [String(section || "")]
+  }
+
   function barSectionRect(region) {
     var bar = root.shell && root.shell.bar ? root.shell.bar : null
     if (!bar || !bar.moduleSlots || !region) return null
     var overlay = root.overlayScreen()
+    var regions = root.barRegions(region)
     var rects = []
     for (var i = 0; i < bar.moduleSlots.length; i++) {
       var slot = bar.moduleSlots[i]
-      if (!slot || String(slot.region || "") !== String(region)) continue
+      if (!slot || regions.indexOf(String(slot.region || "")) === -1) continue
       if (!slot.visible || slot.width < 4 || slot.height < 4) continue
       var win = typeof bar.slotWindow === "function" ? bar.slotWindow(slot) : null
       if (win && overlay && !root.sameScreen(win.screen, overlay)) continue
