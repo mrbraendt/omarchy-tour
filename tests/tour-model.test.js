@@ -178,7 +178,7 @@ assert.ok(matches(clip, { key: "V", meta: true, alt: false, ctrl: true, shift: f
 const work = stepsFor("standard").find(s => s.id === "workspaces")
 assert.ok(matches(work, { key: "Tab", meta: true, alt: false, ctrl: false, shift: false }))
 assert.ok(work.body.indexOf("currently selected window (for example your browser)") !== -1)
-assert.ok(work.demo.command.indexOf("hl.dsp.focus({ workspace = \"e+1\" })") !== -1)
+assert.ok(work.demo.command.indexOf("hl.dsp.focus({ workspace = \"m+1\" })") !== -1)
 
 const snap = stepsFor("standard").find(s => s.id === "snap")
 assert.ok(matches(snap, { key: "Left", meta: true, alt: false, ctrl: false, shift: false }))
@@ -253,7 +253,7 @@ assert.ok(!recap.some(item => item.title === "That was the Omarchy tour"))
 
 const groups = sandbox.overviewGroups("short")
 assert.ok(groups.length >= 3)
-assert.ok(groups.some(g => g.label === "Open things"))
+assert.ok(groups.some(g => g.label === "Opening applications"))
 assert.ok(groups.some(g => g.label === "Window management"))
 assert.ok(groups.some(g => g.label === "The bar"))
 assert.ok(!groups.some(g => g.items.some(item => item.id === "apps-ahead")))
@@ -441,5 +441,20 @@ const afterClose = sandbox.playgroundLayout([demoWin("0x1")])
 assert.ok(sandbox.playgroundSucceeded({ kind: "close" }, beforeFocus, afterClose))
 assert.ok(sandbox.isPlaygroundStep(playground))
 assert.ok(!sandbox.isPlaygroundStep(terminal))
+
+// Each workspace key runs its own command, matching Omarchy's binds.
+const ws = stepsFor("standard").find(s => s.id === "workspaces")
+assert.strictEqual(demoCommand(ws, { key: "1", meta: true, alt: false, ctrl: false, shift: false }).slice(-1)[0], "o.workspaces.focus(1)")
+assert.ok(demoCommand(ws, { key: "Tab", meta: true, alt: false, ctrl: false, shift: false }).slice(-1)[0].indexOf("m+1") !== -1)
+
+// Super + Shift + Ctrl + Space opens themes, not backgrounds.
+const look = stepsFor("standard").find(s => s.id === "theme")
+assert.deepStrictEqual(Array.from(demoCommand(look, { key: "Space", meta: true, alt: false, ctrl: true, shift: true })), ["omarchy-menu", "toggle", "theme"])
+assert.deepStrictEqual(Array.from(demoCommand(look, { key: "Space", meta: true, alt: false, ctrl: true, shift: false })), ["omarchy-menu", "toggle", "background"])
+
+// The chooser shows how many lessons each length has.
+const counted = lengthMeta({ monitors: 2, hasAgent: true })
+assert.ok(counted[0].lessons > 0 && counted[0].lessons < counted[1].lessons && counted[1].lessons < counted[2].lessons)
+assert.strictEqual(counted[0].lessons, stepsFor("short").filter(s => s.kind !== "title" && s.id !== "done").length)
 
 console.log("ok  short " + shortIds.length + " / standard " + standardIds.length + " / extensive " + extensiveIds.length)

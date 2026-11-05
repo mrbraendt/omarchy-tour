@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
@@ -29,7 +30,6 @@ Item {
   property var trackedAddresses: []
   property bool slideEnabled: true
   property bool hasAgent: true
-  property bool isLaptop: true
   property var skipSnapshot: null
   property bool playgroundActive: false
   property bool playgroundWaiting: false
@@ -46,11 +46,11 @@ Item {
   readonly property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/tour.json"
   property int monitorCount: 2
   property int clientCount: 2
-  property string kbLayout: "us"
   property string resizeLeftSym: "minus"
   property string resizeRightSym: "equal"
   readonly property var lengthOptions: TourModel.lengthMeta(root.filterOpts())
-  readonly property int stepTotal: TourModel.stepsFor(root.lengthId, root.filterOpts()).length
+  readonly property var steps: TourModel.stepsFor(root.lengthId, root.filterOpts())
+  readonly property int stepTotal: root.steps.length
   readonly property bool canGoBack: !root.choosing && (
     (root.playgroundActive && !root.playgroundWaiting && (root.playgroundFree || root.playgroundIndex > 0))
     || (!root.playgroundActive && root.stepIndex > 0)
@@ -59,10 +59,19 @@ Item {
     root.playgroundActive
     || root.stepIndex < Math.max(0, root.stepTotal - 1)
   )
-  readonly property bool onLast: !root.choosing && TourModel.isLast(root.lengthId, root.stepIndex, root.filterOpts())
+  readonly property bool onLast: !root.choosing && root.stepIndex >= root.stepTotal - 1
+  readonly property string progressText: {
+    if (root.choosing || !root.step) return ""
+    if (root.playgroundActive) {
+      if (root.playgroundWaiting || root.playgroundFree) return "Playground"
+      return "Playground  " + (root.playgroundIndex + 1) + " / " + (root.playgroundTaskList || []).length
+    }
+    var label = TourModel.sectionLabel(root.step.section || "")
+    var counter = (root.stepIndex + 1) + " / " + root.stepTotal
+    return label ? label + "  ·  " + counter : counter
+  }
   readonly property string diagramKind: (!root.choosing && root.step && root.step.diagram) ? String(root.step.diagram) : "none"
   readonly property bool showHints: !root.choosing && (root.stepIndex === 0 || root.onLast)
-  readonly property var overviewItems: TourModel.overviewItems(root.lengthId, root.filterOpts())
   readonly property var overviewGroups: TourModel.overviewGroups(root.lengthId, root.filterOpts())
   readonly property bool letThrough: !root.choosing && (root.playgroundActive || !!(root.step && root.step.letThrough))
   readonly property bool playgroundShowingKeys: root.playgroundActive && !root.playgroundFree && !!root.playgroundTask
@@ -101,13 +110,12 @@ Item {
   )
   readonly property var titleBorderSpec: Border.surfaceSpec("menu", "border", Color.accent, Math.max(2, Style.space(2)))
   readonly property bool showKeycaps: !root.choosing && !root.titleCard && (root.playgroundShowingKeys || root.nonempty(root.keycaps))
-  readonly property var practiceCaps: (root.step && root.step.practiceCaps) ? root.step.practiceCaps : []
   readonly property var keyGuide: root.playgroundFree
     ? TourModel.playgroundKeyGuide(root.lengthId, {
         resizeLeft: root.resizeLeftSym,
         resizeRight: root.resizeRightSym
       })
-    : root.practiceCaps
+    : []
 
   function nonempty(list) {
     return !!(list && list.length)
@@ -484,7 +492,7 @@ Item {
   }
 
   function startPlayground() {
-    var session = TourModel.playgroundTasks(root.lengthId, root.trackOpts())
+    var session = TourModel.playgroundTasks(root.lengthId, root.filterOpts())
     var need = TourModel.playgroundWindowCount(root.lengthId)
     root.playgroundTaskList = session
     root.playgroundNeed = need
@@ -542,18 +550,9 @@ Item {
     return {
       monitors: root.skipSnapshot ? root.skipSnapshot.monitors : root.monitorCount,
       hasAgent: root.skipSnapshot ? root.skipSnapshot.hasAgent : root.hasAgent,
-      laptop: root.skipSnapshot ? root.skipSnapshot.laptop : root.isLaptop,
-      kbLayout: root.kbLayout,
       resizeLeft: root.resizeLeftSym,
-      resizeRight: root.resizeRightSym,
-      launchCount: (root.trackedAddresses && root.trackedAddresses.length) ? root.trackedAddresses.length : 0
+      resizeRight: root.resizeRightSym
     }
-  }
-
-  function trackOpts() {
-    var opts = root.filterOpts()
-    opts.clients = root.clientCount
-    return opts
   }
 
   function pluginFile(name) {
@@ -568,9 +567,14 @@ Item {
     return root.pluginFile("tour-lights.py")
   }
 
+  property string lastLights: ""
+
   function runLights(args) {
     var script = root.lightsPath()
     if (!script) return
+    var key = args.join("\u0001")
+    if (key === root.lastLights) return
+    root.lastLights = key
     var cmd = ["python3", script]
     for (var i = 0; i < args.length; i++) cmd.push(String(args[i]))
     Quickshell.execDetached(cmd)
@@ -594,10 +598,19 @@ Item {
     root.runLights(args)
   }
 
+  property bool clientsPending: false
+
   function refreshClients() {
-    if (clientProbe.running) return
+    if (clientProbe.running) {
+      root.clientsPending = true
+      return
+    }
+    root.clientsPending = false
     clientProbe.running = true
   }
+
+  readonly property bool watchingClients: root.panelVisible && (root.playgroundActive || root.captureLaunches
+    || root.spotlightTargets.some(function(t) { return t.kind === "windows" || t.kind === "app" }))
 
   function probeLayout() {
     if (!monitorProbe.running) monitorProbe.running = true
@@ -606,13 +619,16 @@ Item {
 
   function probeAll() {
     root.probeLayout()
-    if (!laptopProbe.running) laptopProbe.running = true
     if (!agentProbe.running) agentProbe.running = true
     keymapProbe.command = ["python3", root.pluginFile("tour-keymap.py")]
     if (!keymapProbe.running) keymapProbe.running = true
   }
 
-  Component.onCompleted: root.probeAll()
+  // Create the state folder once up front, so later writes never race mkdir.
+  Component.onCompleted: {
+    Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/omarchy"])
+    root.probeAll()
+  }
 
   onPausedChanged: root.refreshSpotlight()
   onOverviewingChanged: root.refreshSpotlight()
@@ -623,7 +639,7 @@ Item {
 
   function refreshResizeCopy() {
     if (root.choosing || !root.step || root.step.id !== "resize") return
-    var next = TourModel.stepAt(root.lengthId, root.stepIndex, root.trackOpts())
+    var next = root.steps[root.stepIndex] || null
     if (!next) return
     root.step = next
     var caps = []
@@ -643,7 +659,6 @@ Item {
   function markSeen() {
     var current = TourModel.parseState(stateFile.text())
     if (current.seen || current.completed || current.skipped) return
-    Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/omarchy"])
     stateFile.setText(TourModel.serializeState(current.completed, current.length, current.skipped, true))
   }
 
@@ -664,7 +679,7 @@ Item {
   }
 
   function dispatchPlaygroundKey(ev) {
-    var cmd = TourModel.playgroundKeyCommand(ev, root.trackOpts())
+    var cmd = TourModel.playgroundKeyCommand(ev, root.filterOpts())
     if (!cmd || !cmd.length) return false
     root.execTourCommand(cmd)
     root.refreshClients()
@@ -711,15 +726,7 @@ Item {
   }
 
   function dismiss() {
-    resumeTimer.stop()
-    practiceTimer.stop()
-    root.paused = false
-    root.practiced = false
-    root.overviewing = false
-    root.opened = false
-    root.closeTrackedWindows()
-    root.leavePlayground()
-    root.runLights(["restore"])
+    root.close()
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide(root.pluginId)
   }
@@ -732,8 +739,7 @@ Item {
   function startLength(id) {
     root.skipSnapshot = {
       monitors: root.monitorCount,
-      hasAgent: root.hasAgent,
-      laptop: root.isLaptop
+      hasAgent: root.hasAgent
     }
     root.captureLaunches = false
     root.trackedAddresses = []
@@ -747,7 +753,7 @@ Item {
   function loadStep(index) {
     if (root.playgroundActive) root.leavePlayground()
     var prev = root.step
-    var next = TourModel.stepAt(root.lengthId, index, root.trackOpts())
+    var next = (index >= 0 && index < root.steps.length) ? root.steps[index] : null
     var caps = []
     if (next && next.keycaps) {
       for (var i = 0; i < next.keycaps.length; i++) caps.push(next.keycaps[i])
@@ -788,7 +794,6 @@ Item {
   }
 
   function finish() {
-    Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/omarchy"])
     stateFile.setText(TourModel.serializeState(true, root.lengthId, false, true))
     root.dismiss()
   }
@@ -806,7 +811,7 @@ Item {
       return
     }
     if (root.stepIndex <= 0) return
-    var list = TourModel.stepsFor(root.lengthId, root.trackOpts())
+    var list = root.steps
     var currentId = root.step ? root.step.id : ""
     var here = -1
     for (var i = 0; i < list.length; i++) {
@@ -828,7 +833,7 @@ Item {
       root.onLastEnter()
       return
     }
-    var list = TourModel.stepsFor(root.lengthId, root.trackOpts())
+    var list = root.steps
     var currentId = root.step ? root.step.id : ""
     var here = -1
     for (var i = 0; i < list.length; i++) {
@@ -1314,6 +1319,7 @@ Item {
   Process {
     id: clientProbe
     command: ["hyprctl", "-j", "clients"]
+    onExited: if (root.clientsPending) Qt.callLater(root.refreshClients)
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -1325,14 +1331,6 @@ Item {
           if (root.spotlightTargets.length) root.refreshSpotlight()
         }
       }
-    }
-  }
-
-  Process {
-    id: laptopProbe
-    command: ["omarchy-hw-laptop"]
-    onExited: function(exitCode) {
-      root.isLaptop = exitCode === 0
     }
   }
 
@@ -1355,7 +1353,6 @@ Item {
       onStreamFinished: {
         try {
           var data = JSON.parse(text)
-          if (data.layout) root.kbLayout = String(data.layout)
           if (data.code20) root.resizeLeftSym = String(data.code20)
           if (data.code21) root.resizeRightSym = String(data.code21)
         } catch (e) {}
@@ -1419,12 +1416,33 @@ Item {
     onTriggered: root.afterPlaygroundPulse()
   }
 
+  // Hyprland events refresh the window list right away; this slow poll only
+  // catches geometry changes that Hyprland does not announce.
   Timer {
-    id: playgroundPollTimer
-    interval: 280
+    id: clientPollTimer
+    interval: 1000
     repeat: true
-    running: root.panelVisible && root.playgroundActive
+    running: root.watchingClients
     onTriggered: root.refreshClients()
+  }
+
+  Timer {
+    id: clientEventTimer
+    interval: 60
+    repeat: false
+    onTriggered: root.refreshClients()
+  }
+
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (!root.watchingClients) return
+      var name = String(event.name || "")
+      if (name === "openwindow" || name === "closewindow" || name === "changefloatingmode"
+          || name === "fullscreen" || name === "pin" || name === "activewindowv2"
+          || name === "movewindowv2" || name === "swapwindow")
+        clientEventTimer.restart()
+    }
   }
 
   Timer {
@@ -1444,15 +1462,7 @@ Item {
     interval: 350
     repeat: true
     running: root.panelVisible && !root.choosing && root.spotlightTargets.length > 0
-    onTriggered: {
-      var needsClients = false
-      for (var i = 0; i < root.spotlightTargets.length; i++) {
-        var kind = root.spotlightTargets[i].kind
-        if (kind === "windows" || kind === "app") needsClients = true
-      }
-      if (needsClients) root.refreshClients()
-      root.refreshSpotlight()
-    }
+    onTriggered: root.refreshSpotlight()
   }
 
   Connections {
@@ -1597,9 +1607,16 @@ Item {
             onActivated: root.goBack()
           }
 
-          Item {
+          Text {
             width: parent.width - Style.space(44) * 2 - Style.space(12) * 2
-            height: Style.space(1)
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.progressText
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
           }
 
           NavArrow {
@@ -1906,15 +1923,6 @@ Item {
                 }
               }
 
-              Text {
-                visible: root.practiceCaps.length > 0 && !root.playgroundFree
-                text: "Try these again"
-                color: Color.muted
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                font.bold: true
-              }
-
               Repeater {
                 model: root.keyGuide.length
                 delegate: Item {
@@ -2003,7 +2011,7 @@ Item {
         Text {
           width: parent.width
           visible: root.choosing
-          text: "Select tour and press Enter"
+          text: "Press 1, 2, or 3 — or pick one and press Enter"
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.heading
@@ -2037,23 +2045,47 @@ Item {
                 spacing: Style.space(16)
 
                 Rectangle {
-                  width: Style.space(10)
-                  height: Style.space(10)
-                  radius: width / 2
-                  color: lengthRow.selected ? Color.accent : Util.alpha(root.foreground, 0.25)
+                  id: lengthKey
+                  width: Style.space(36)
+                  height: Style.space(36)
+                  radius: Math.min(root.cornerRadius, Style.space(8))
+                  color: lengthRow.selected ? Color.accent : Util.alpha(root.foreground, 0.08)
                   anchors.verticalCenter: parent.verticalCenter
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: lengthRow.modelData.key
+                    color: lengthRow.selected ? root.background : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                  }
                 }
 
-                Text {
+                Column {
                   id: lengthLabel
                   anchors.verticalCenter: parent.verticalCenter
-                  width: parent.width - Style.space(26)
-                  text: lengthRow.modelData.label
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.heading
-                  font.bold: true
-                  wrapMode: Text.WordWrap
+                  width: parent.width - lengthKey.width - Style.space(16)
+                  spacing: Style.space(2)
+
+                  Text {
+                    width: parent.width
+                    text: lengthRow.modelData.label + "  ·  " + lengthRow.modelData.lessons + " lessons"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.heading
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                  }
+
+                  Text {
+                    width: parent.width
+                    text: lengthRow.modelData.detail
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    wrapMode: Text.WordWrap
+                  }
                 }
               }
 

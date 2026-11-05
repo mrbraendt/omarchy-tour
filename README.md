@@ -37,8 +37,9 @@ omarchy plugin add "$PWD" --enable
 
 ## Usage
 
-**Tour of Omarchy**: **1** Short, **2** Standard, **3** Extensive. Enter starts
-Standard. Esc below the three choices closes the tour.
+**Tour of Omarchy**: press **1** Short, **2** Standard, or **3** Extensive, or
+pick one and press Enter. Each choice shows what it covers and how many lessons
+it has. Esc closes the tour.
 
 Window lessons open Files, the browser, and a terminal first, then teach tiling
 on those windows. Super + W closes them so you finish on the same desktop you
@@ -55,9 +56,12 @@ use Super + W while those lessons are on screen.
 
 | Length | What you get |
 | --- | --- |
-| Short | Menu, Files, browser, terminal, tiling, close, bar, workspaces, AI agent |
-| Standard | Plus move, snap, bar center/right, look and background, two monitors, clipboard |
-| Extensive | Plus resize, pop-out, every shortcut |
+| Short | Menu, Files, browser, tiling, close, playground, bar, workspaces, AI agent |
+| Standard | Plus terminal, move, swap, bar center/right, look and background, clipboard, two monitors |
+| Extensive | Plus resize, pop-out, full screen, every shortcut |
+
+The card shows where you are (section and `3 / 21`). The AI agent lesson only
+appears when an agent is set up; the two-monitor lesson only with two screens.
 
 ```sh
 omarchy-shell shell toggle io.github.herr-brandt.tour '{}'

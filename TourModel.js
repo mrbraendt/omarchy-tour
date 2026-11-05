@@ -252,14 +252,14 @@ function allSteps() {
       body: "The numbered pills on the left of the bar are workspaces — extra screens for grouping windows. Super + Tab walks them. Super + 1 through 0 jumps to one. Super + Shift + a number takes the currently selected window (for example your browser) with you.",
       section: "bar",
       keys: [
-        { key: "Tab", meta: true, alt: false, ctrl: false, shift: false },
-        { key: "1", meta: true, alt: false, ctrl: false, shift: false }
+        { key: "Tab", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = \"m+1\" })"] },
+        { key: "1", meta: true, alt: false, ctrl: false, shift: false, command: ["hyprctl", "dispatch", "o.workspaces.focus(1)"] }
       ],
       keycaps: ["Super", "Tab"],
       spotlight: "chip:omarchy.workspaces",
       diagram: "workspaces",
       enter: "demo",
-      demo: { command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = \"e+1\" })"] },
+      demo: { command: ["hyprctl", "dispatch", "hl.dsp.focus({ workspace = \"m+1\" })"] },
       resumeMs: 1800,
       tracks: ["short", "standard", "extensive"]
     },
@@ -312,8 +312,8 @@ function allSteps() {
       body: "Super + Ctrl + Space picks a background. Super + Shift + Ctrl + Space opens themes.",
       section: "extras",
       keys: [
-        { key: "Space", meta: true, alt: false, ctrl: true, shift: false },
-        { key: "Space", meta: true, alt: false, ctrl: true, shift: true }
+        { key: "Space", meta: true, alt: false, ctrl: true, shift: false, command: ["omarchy-menu", "toggle", "background"] },
+        { key: "Space", meta: true, alt: false, ctrl: true, shift: true, command: ["omarchy-menu", "toggle", "theme"] }
       ],
       keycaps: ["Super", "Ctrl", "Space"],
       spotlight: "layer:omarchy.menu",
@@ -423,17 +423,6 @@ function monitorCountFrom(opts) {
   return n
 }
 
-function clientCountFrom(opts) {
-  if (!opts || opts.clients === undefined || opts.clients === null || opts.clients === "") return 2
-  var n = Number(opts.clients)
-  if (!isFinite(n) || n < 0) return 0
-  return n
-}
-
-function windowsMissing(opts) {
-  return clientCountFrom(opts) < 2
-}
-
 function boolOpt(opts, name, fallback) {
   if (!opts || opts[name] === undefined || opts[name] === null) return fallback
   return opts[name] === true
@@ -441,10 +430,6 @@ function boolOpt(opts, name, fallback) {
 
 function hasAgentFrom(opts) {
   return boolOpt(opts, "hasAgent", true)
-}
-
-function isLaptopFrom(opts) {
-  return boolOpt(opts, "laptop", true)
 }
 
 function knownDiagrams() {
@@ -795,11 +780,6 @@ function resolveStep(step, opts) {
   for (var key in step) copy[key] = step[key]
   if (!copy.diagram) copy.diagram = "none"
   if (!copy.spotlight) copy.spotlight = "none"
-  if (step.needsWindows && windowsMissing(opts)) {
-    if (step.emptyBody) copy.body = step.emptyBody
-    if (step.emptyEnter) copy.enter = step.emptyEnter
-    if ("emptyDemo" in step) copy.demo = step.emptyDemo
-  }
   if (step.id === "resize") {
     var left = resizeLeftKey(opts)
     var right = resizeRightKey(opts)
@@ -839,20 +819,11 @@ function resolveStep(step, opts) {
   return copy
 }
 
-function launchCountFrom(opts) {
-  if (!opts || opts.launchCount === undefined || opts.launchCount === null || opts.launchCount === "") return 0
-  var n = Number(opts.launchCount)
-  if (!isFinite(n) || n < 0) return 0
-  return n
-}
-
 function stepApplies(step, opts) {
   if (!step) return false
   var monitors = monitorCountFrom(opts)
   if (step.minMonitors && monitors < step.minMonitors) return false
   if (step.requiresAgent && !hasAgentFrom(opts)) return false
-  if (step.requiresLaptop && !isLaptopFrom(opts)) return false
-  if (step.requiresFewWindows && launchCountFrom(opts) >= 2) return false
   return true
 }
 
@@ -874,32 +845,26 @@ function stepsFor(length, opts) {
   return out
 }
 
+function lessonCount(length, opts) {
+  var list = stepsFor(length, opts)
+  var n = 0
+  for (var i = 0; i < list.length; i++) {
+    if (!isTitleCard(list[i]) && list[i].id !== "done") n++
+  }
+  return n
+}
+
 function lengthMeta(opts) {
   var shortDetail = hasAgentFrom(opts)
-    ? "Open apps, tile them, close them, workspaces, and the agent"
-    : "Open apps, tile them, close them, and workspaces"
+    ? "Menu, apps, tiling, closing windows, workspaces, and the AI agent"
+    : "Menu, apps, tiling, closing windows, and workspaces"
   var standardDetail = monitorCountFrom(opts) >= 2
-    ? "Plus move, snap, two monitors, and the bar"
-    : "Plus move, snap, and the bar"
+    ? "Plus terminal, moving and swapping windows, the whole bar, looks, clipboard, and two monitors"
+    : "Plus terminal, moving and swapping windows, the whole bar, looks, and clipboard"
   return [
-    {
-      id: "short",
-      key: "1",
-      label: "Short Tour",
-      detail: shortDetail
-    },
-    {
-      id: "standard",
-      key: "2",
-      label: "Standard Tour",
-      detail: standardDetail
-    },
-    {
-      id: "extensive",
-      key: "3",
-      label: "Extensive Tour",
-      detail: "Resize, pop-out, full screen, keybindings, and themes"
-    }
+    { id: "short", key: "1", label: "Short Tour", detail: shortDetail, lessons: lessonCount("short", opts) },
+    { id: "standard", key: "2", label: "Standard Tour", detail: standardDetail, lessons: lessonCount("standard", opts) },
+    { id: "extensive", key: "3", label: "Extensive Tour", detail: "Plus resizing, pop-out, full screen, and every shortcut", lessons: lessonCount("extensive", opts) }
   ]
 }
 
@@ -1039,7 +1004,7 @@ function isTitleCard(step) {
 }
 
 function sectionLabel(id) {
-  if (id === "apps") return "Open things"
+  if (id === "apps") return "Opening applications"
   if (id === "windows") return "Window management"
   if (id === "bar") return "The bar"
   if (id === "extras") return "A few extras"
