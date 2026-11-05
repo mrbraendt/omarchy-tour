@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Numbered demo window. Draw once after the terminal is sized; redraw only on resize."""
+"""Numbered demo window for the tour playground.
+
+Draws a big digit once the terminal has its real size, then redraws only on resize.
+"""
 import signal
 import shutil
 import sys
@@ -123,7 +126,6 @@ def quit_(_signum=None, _frame=None):
 signal.signal(signal.SIGTERM, quit_)
 signal.signal(signal.SIGINT, quit_)
 signal.signal(signal.SIGHUP, quit_)
-signal.signal(signal.SIGWINCH, draw)
 
 sized = {"ok": False}
 

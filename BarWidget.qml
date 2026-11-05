@@ -20,17 +20,17 @@ BarWidget {
   function markSeen() {
     var current = TourModel.parseState(stateFile.text())
     if (current.seen || current.completed || current.skipped) return
-    Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/omarchy"])
     stateFile.setText(TourModel.serializeState(current.completed, current.length, current.skipped, true))
     root.nudge = false
   }
 
   function skipNudge() {
     if (!root.nudge) return
-    Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/omarchy"])
     stateFile.setText(TourModel.serializeState(false, "standard", true, true))
     root.nudge = false
   }
+
+  Component.onCompleted: Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.local/state/omarchy"])
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
